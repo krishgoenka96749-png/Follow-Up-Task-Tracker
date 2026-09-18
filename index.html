@@ -487,7 +487,8 @@ button.act:disabled{opacity:.55;cursor:default}
   var S = {
     tasks: [], notes: [], subjects: [], inbox: [],
     filter: "open", open: null, openPend: null, editing: null, loaded: false, connected: false,
-    tab: "ledger", dirOpen: {mine: true, theirs: true}, confirmAll: false, openNote: null, addingNote: false, noteNew: {}, drafts: {}, fieldDraft: {}, logAll: {}, deferred: false, scrollTo: null
+    tab: "ledger", dirOpen: {mine: true, theirs: true}, confirmAll: false, openNote: null, addingNote: false, noteNew: {}, drafts: {}, fieldDraft: {}, logAll: {}, deferred: false, scrollTo: null,
+    dirPrompt: null, triedConnect: false
   };
   try{
     var savedTab = window.localStorage.getItem("ledger-tab");
@@ -541,9 +542,12 @@ button.act:disabled{opacity:.55;cursor:default}
     return id ? id : "Unfiled";
   }
   function live(t){ return t.status !== "done" && t.status !== "dropped"; }
+  function dirOf(o){ return o.direction === "theirs" ? "theirs" : "mine"; }
   function editsFor(id){ return S.inbox.filter(function(it){ return it.kind === "edit" && (it.task_id === id || it.inbox_id === id); }); }
-  function findTask(id){ for(var i=0;i<S.tasks.length;i++) if(S.tasks[i].id === id) return S.tasks[i]; return null; }
-  function findNote(id){ for(var i=0;i<S.notes.length;i++) if(S.notes[i].id === id) return S.notes[i]; return null; }
+  function findIn(list, id){ for(var i=0;i<list.length;i++) if(list[i].id === id) return list[i]; return null; }
+  function findTask(id){ return findIn(S.tasks, id); }
+  function findNote(id){ return findIn(S.notes, id); }
+  function findInbox(id){ return findIn(S.inbox, id); }
   // Which collection a doc lives in, by lookup rather than id prefix (filed notes and pending notes can share n_).
   function collOf(id){
     if(findTask(id)) return "tasks";
@@ -551,15 +555,18 @@ button.act:disabled{opacity:.55;cursor:default}
     if(findInbox(id)) return "inbox";
     return null;
   }
-  function findInbox(id){ for(var i=0;i<S.inbox.length;i++) if(S.inbox[i].id === id) return S.inbox[i]; return null; }
   function taskTitle(id){ var t = findTask(id); return t ? t.title : "a deleted task"; }
-  function pendingTitle(id){ var it = findInbox(id); return it ? (it.title || it.raw || "a pending item") : "a filed item"; }
   function whoPhrase(o){
     if(o.direction === "theirs") return o.counterparty ? o.counterparty + " owes you" : "Owed to you";
     return o.counterparty ? "You owe " + o.counterparty : "";
   }
   function plural(n, one, many){ return n + " " + (n === 1 ? one : many); }
-  function copyOf(o){ var c = {}; for(var k in o) if(k !== "id" && Object.prototype.hasOwnProperty.call(o,k)) c[k] = o[k]; return c; }
+  function has(o, k){ return Object.prototype.hasOwnProperty.call(o, k); }
+  function trim(s){ return s.replace(/^\s+|\s+$/g, ""); }
+  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+  function newId(prefix){ return prefix + Date.now().toString(36) + Math.floor(Math.random()*36).toString(36); }
+  function nowIso(){ return new Date().toISOString(); }
+  function copyOf(o){ var c = {}; for(var k in o) if(k !== "id" && has(o,k)) c[k] = o[k]; return c; }
   function isTask(id){ return String(id).charAt(0) === "t"; }
   function isTyping(){
     var a = document.activeElement;
@@ -617,7 +624,7 @@ button.act:disabled{opacity:.55;cursor:default}
   /* ---------- editable field ---------- */
   // Context is the person's own free text. Until they write any, it starts from the capture source.
   function contextValue(o){
-    if(Object.prototype.hasOwnProperty.call(o, "context")) return o.context || "";
+    if(has(o, "context")) return o.context || "";
     return o.source ? "Source: " + o.source : "";
   }
   function labelFor(obj, key){
@@ -628,7 +635,7 @@ button.act:disabled{opacity:.55;cursor:default}
   function knownPeople(exclude){
     var n = {};
     S.tasks.concat(S.inbox).forEach(function(o){
-      var c = (o.counterparty || "").replace(/^\s+|\s+$/g, "");
+      var c = trim(o.counterparty || "");
       if(c) n[c] = (n[c] || 0) + 1;
     });
     return Object.keys(n).filter(function(c){ return c !== exclude; })
@@ -649,7 +656,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var raw = key === "context" ? contextValue(t) : (t[key] || "");
     var editKey = t.id + "::" + key;
     if(S.editing === editKey){
-      var cur = Object.prototype.hasOwnProperty.call(S.fieldDraft, editKey) ? S.fieldDraft[editKey] : raw;
+      var cur = has(S.fieldDraft, editKey) ? S.fieldDraft[editKey] : raw;
       var input, a = ' data-field-input="' + esc(editKey) + '" id="fe-' + esc(editKey) + '"';
       if(kind === "date"){
         input = '<input type="date"' + a + ' value="' + esc(cur) + '">';
@@ -661,7 +668,7 @@ button.act:disabled{opacity:.55;cursor:default}
       } else if(kind === "priority"){
         input = '<select' + a + '>' + ["low","normal","high"].map(function(o){
             return '<option value="' + o + '"' + (o === (cur || "normal") ? " selected" : "") + '>' +
-              o.charAt(0).toUpperCase() + o.slice(1) + '</option>';
+              cap(o) + '</option>';
           }).join("") + '</select>';
       } else if(kind === "textarea"){
         input = '<textarea' + a + (key === "context" ? ' placeholder="Anything worth keeping: where it came from, who said what, links."' : "") + '>' + esc(cur) + '</textarea>';
@@ -698,7 +705,7 @@ button.act:disabled{opacity:.55;cursor:default}
         if(d && /late|today|tomorrow/.test(w)) shown += " (" + w + ")";
       }
       else if(kind === "select") shown = subjectName(raw);
-      else if(kind === "priority") shown = raw.charAt(0).toUpperCase() + raw.slice(1);
+      else if(kind === "priority") shown = cap(raw);
       else shown = raw;
     }
     return '<button type="button" class="field-row' + (kind === "textarea" ? " field-row-wrap" : "") + (key === "context" ? " is-context" : "") + '" data-edit-field="' + esc(editKey) + '">' +
@@ -1325,7 +1332,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var t = findTask(id);
     if(!t || !db) return;
     var prev = {status: t.status || "open", updated: t.updated || "", history: Array.isArray(t.history) ? t.history.slice() : []};
-    var now = new Date().toISOString();
+    var now = nowIso();
     var hist = prev.history.slice();
     hist.push({at: now, text: "Status set to " + status + " from the ledger page."});
     t.status = status; t.updated = now; t.history = hist;
@@ -1359,17 +1366,17 @@ button.act:disabled{opacity:.55;cursor:default}
       var inp = document.querySelector(sel("data-field-input", editKey));
       val = inp ? inp.value : (S.fieldDraft[editKey] || "");
     }
-    if(typeof val === "string") val = val.replace(/^\s+|\s+$/g, "");
+    if(typeof val === "string") val = trim(val);
     if((key === "title" || key === "body") && !val){
       toast(labelFor(obj, key) + " can\u2019t be empty.", {error: true});
       return;
     }
     var oldVal = key === "context" ? contextValue(obj) : (obj[key] || "");
-    if(key === "context" && val === oldVal && Object.prototype.hasOwnProperty.call(obj, "context")){ S.editing = null; render(); return; }
+    if(key === "context" && val === oldVal && has(obj, "context")){ S.editing = null; render(); return; }
     delete S.fieldDraft[editKey];
     S.dirPrompt = null;
     if(val === oldVal){ S.editing = null; render(); return; }
-    var now = new Date().toISOString();
+    var now = nowIso();
     var patch = {}; patch[key] = val;
     if(task){
       var hist = (Array.isArray(obj.history) ? obj.history.slice() : []);
@@ -1390,12 +1397,12 @@ button.act:disabled{opacity:.55;cursor:default}
   function saveNewNote(){
     if(!db) return;
     var ta = document.getElementById("nn-body");
-    var body = ((ta ? ta.value : S.noteNew.body) || "").replace(/^\s+|\s+$/g, "");
+    var body = trim((ta ? ta.value : S.noteNew.body) || "");
     if(!body){ if(ta) ta.focus(); return; }
     var selEl = document.querySelector('[data-new-note="subject"]');
     var subject = selEl ? selEl.value : (S.noteNew.subject || "");
-    var now = new Date().toISOString();
-    var id = "n_" + Date.now().toString(36) + Math.floor(Math.random()*36).toString(36);
+    var now = nowIso();
+    var id = newId("n_");
     db.doc("notes/" + id).set({body: body, subject: subject, task_id: "", created: now, source: "added on the ledger page"})
       .then(function(){
         S.addingNote = false; S.noteNew = {};
@@ -1425,7 +1432,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(!obj) return;
     var prevDir = obj.direction === "theirs" ? "theirs" : "mine";
     if(prevDir === dir) return;
-    var now = new Date().toISOString();
+    var now = nowIso();
     var prev = {direction: obj.direction || "mine"};
     var patch = {direction: dir};
     if(task){
@@ -1461,13 +1468,13 @@ button.act:disabled{opacity:.55;cursor:default}
   function submitEdit(targetId){
     if(!db) return;
     var ta = document.querySelector("textarea" + sel("data-edit-for", targetId));
-    var text = ((ta ? ta.value : S.drafts[targetId]) || "").replace(/^\s+|\s+$/g, "");
+    var text = trim((ta ? ta.value : S.drafts[targetId]) || "");
     if(!text){ if(ta) ta.focus(); return; }
     var task = isTask(targetId);
     var owner = task ? findTask(targetId) : findInbox(targetId);
     var subj = owner ? owner.subject || "" : "";
-    var now = new Date().toISOString();
-    var id = "i_" + Date.now().toString(36) + Math.floor(Math.random()*36).toString(36);
+    var now = nowIso();
+    var id = newId("i_");
     var btn = document.querySelector(sel("data-submit-edit", targetId));
     if(btn){ btn.disabled = true; btn.textContent = "\u2026"; }
     var doc = { kind: "edit", raw: text, subject: subj, created: now };
@@ -1490,11 +1497,11 @@ button.act:disabled{opacity:.55;cursor:default}
     var it = findInbox(id);
     if(!it || it.kind === "edit") return Promise.resolve(null); // updates are for Claude, never filed from here
     var saved = copyOf(it);
-    var now = new Date().toISOString();
+    var now = nowIso();
     if(S.openPend === id) S.openPend = null;
     var p, undo;
     if(it.kind === "note"){
-      var nid = "n_" + Date.now().toString(36) + Math.floor(Math.random()*36).toString(36);
+      var nid = newId("n_");
       p = db.doc("notes/" + nid).set({
         body: it.body || it.raw || it.title || "",
         subject: it.subject || "",
@@ -1505,7 +1512,7 @@ button.act:disabled{opacity:.55;cursor:default}
         return db.doc("inbox/" + id).set(saved).then(function(){ return db.doc("notes/" + nid).delete(); });
       };
     } else {
-      var tid = "t_" + Date.now().toString(36) + Math.floor(Math.random()*36).toString(36);
+      var tid = newId("t_");
       var linked = editsFor(id).map(function(e){ return e.id; });
       p = db.doc("tasks/" + tid).set({
         title: it.title || it.raw || "Untitled",
@@ -1591,7 +1598,7 @@ button.act:disabled{opacity:.55;cursor:default}
   /* ---------- data ---------- */
   function shape(d, snapDoc){
     var o = {};
-    for(var k in d) if(Object.prototype.hasOwnProperty.call(d,k)) o[k] = d[k];
+    for(var k in d) if(has(d,k)) o[k] = d[k];
     o.id = snapDoc.id;
     return o;
   }
