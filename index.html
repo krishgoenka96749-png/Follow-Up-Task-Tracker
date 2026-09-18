@@ -504,6 +504,8 @@ button.act:disabled{opacity:.55;cursor:default}
   var FIELD_LABELS = {title:"Title", due:"Due", counterparty:"With", next_action:"Next step", subject:"Subject", source:"Source", context:"Context", body:"Note", priority:"Priority"};
   var STATUS_TOAST = {done:"Marked done", open:"Moved back to open", waiting:"Marked waiting", blocked:"Marked blocked", dropped:"Task dropped"};
   var LOG_LIMIT = 3;
+  var TASK_FIELDS = [["title","text"],["due","date"],["counterparty","text"],["next_action","text"],["subject","select"],["priority","priority"],["context","textarea"]];
+  var NOTE_FIELDS = [["body","textarea"],["subject","select"]];
 
   /* ---------- helpers ---------- */
   function esc(s){
@@ -642,7 +644,7 @@ button.act:disabled{opacity:.55;cursor:default}
       .sort(function(a,b){ return n[b] - n[a] || a.localeCompare(b); });
   }
   function dirControl(obj){
-    var d = obj.direction === "theirs" ? "theirs" : "mine";
+    var d = dirOf(obj);
     return '<div class="seg seg-dir" role="group" aria-label="Who delivers">' +
       [["mine","I deliver"],["theirs","Owed to me"]].map(function(o){
         var on = d === o[0];
@@ -661,10 +663,7 @@ button.act:disabled{opacity:.55;cursor:default}
       if(kind === "date"){
         input = '<input type="date"' + a + ' value="' + esc(cur) + '">';
       } else if(kind === "select"){
-        input = '<select' + a + '><option value="">Unfiled</option>' +
-          S.subjects.slice().sort(function(x,y){ return (x.order||0) - (y.order||0); }).map(function(s){
-            return '<option value="' + esc(s.id) + '"' + (s.id === cur ? " selected" : "") + '>' + esc(s.name) + '</option>';
-          }).join("") + '</select>';
+        input = '<select' + a + '>' + subjectOptions(cur) + '</select>';
       } else if(kind === "priority"){
         input = '<select' + a + '>' + ["low","normal","high"].map(function(o){
             return '<option value="' + o + '"' + (o === (cur || "normal") ? " selected" : "") + '>' +
@@ -713,6 +712,10 @@ button.act:disabled{opacity:.55;cursor:default}
       '<span class="field-val' + (shown ? "" : " is-empty") + '">' + esc(shown || "Add") + '</span>' +
       '<span class="pencil" aria-hidden="true">' + PENCIL + '</span>' +
     '</button>';
+  }
+
+  function fieldRows(obj, spec){
+    return spec.map(function(f){ return fieldRow(obj, f[0], f[1]); }).join("");
   }
 
   /* ---------- filters ---------- */
@@ -908,7 +911,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var list = S.tasks.filter(matches);
     var sorter = S.filter === "done" ? byRecent : byUrgency;
     ["mine","theirs"].forEach(function(dir){
-      var rows = list.filter(function(t){ return dir === "theirs" ? t.direction === "theirs" : t.direction !== "theirs"; }).sort(sorter);
+      var rows = list.filter(function(t){ return dirOf(t) === dir; }).sort(sorter);
       html += renderDir(dir, rows);
     });
     return html + renderOrphans();
@@ -978,14 +981,7 @@ button.act:disabled{opacity:.55;cursor:default}
         (t.updated ? " on " + esc(stamp(t.updated)) : "") + '</span>' +
         '<button type="button" class="act" data-status="open|' + esc(t.id) + '">Reopen</button></div>';
     }
-    var fields =
-      fieldRow(t, "title", "text") +
-      fieldRow(t, "due", "date") +
-      fieldRow(t, "counterparty", "text") +
-      fieldRow(t, "next_action", "text") +
-      fieldRow(t, "subject", "select") +
-      fieldRow(t, "priority", "priority") +
-      fieldRow(t, "context", "textarea");
+    var fields = fieldRows(t, TASK_FIELDS);
     return '<div class="detail detail-' + dir + '">' +
       '<div class="section-label">Direction</div>' + dirControl(t) +
       '<div class="section-label">Status</div>' + status +
@@ -1028,7 +1024,7 @@ button.act:disabled{opacity:.55;cursor:default}
       if(n.updated && n.updated !== n.created) meta.push("edited " + stamp(n.updated));
       if(S.openNote === n.id){
         return '<div class="note is-open" id="note-' + esc(n.id) + '">' +
-          '<div class="fields">' + fieldRow(n, "body", "textarea") + fieldRow(n, "subject", "select") + '</div>' +
+          '<div class="fields">' + fieldRows(n, NOTE_FIELDS) + '</div>' +
           (meta.length ? '<div class="note-meta">' + esc(meta.join(" \u00b7 ")) + '</div>' : "") +
           '<div class="note-foot">' +
             '<button type="button" class="act quiet" data-del-note="' + esc(n.id) + '">Delete note</button>' +
@@ -1076,7 +1072,7 @@ button.act:disabled{opacity:.55;cursor:default}
 
   function renderPend(it){
     var isNote = it.kind === "note";
-    var dir = it.direction === "theirs" ? "theirs" : "mine";
+    var dir = dirOf(it);
     var tag = isNote ? '<span class="kind-tag is-note">Note</span>'
       : '<span class="kind-tag is-' + dir + '">' + (dir === "theirs" ? "Owed to you" : "You deliver") + '</span>';
     var meta = [];
@@ -1104,12 +1100,7 @@ button.act:disabled{opacity:.55;cursor:default}
   function renderPendDetail(it){
     var raw = (it.raw && it.raw !== it.title && it.raw !== it.body)
       ? '<div class="pend-raw-label">What you said</div><p class="pend-raw">' + esc(it.raw) + '</p>' : "";
-    var fields = it.kind === "note"
-      ? fieldRow(it, "body", "textarea") + fieldRow(it, "subject", "select")
-      : fieldRow(it, "title", "text") + fieldRow(it, "due", "date") +
-        fieldRow(it, "counterparty", "text") + fieldRow(it, "next_action", "text") +
-        fieldRow(it, "subject", "select") + fieldRow(it, "priority", "priority") +
-        fieldRow(it, "context", "textarea");
+    var fields = fieldRows(it, it.kind === "note" ? NOTE_FIELDS : TASK_FIELDS);
     return '<div class="pend-detail">' + raw +
       (it.kind === "note" ? "" : '<div class="section-label">Direction</div>' + dirControl(it)) +
       '<div class="section-label">Details</div>' +
@@ -1155,6 +1146,9 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   /* ---------- interaction ---------- */
+  function cancelFieldEdit(){
+    delete S.fieldDraft[S.editing]; S.editing = null; S.dirPrompt = null; render();
+  }
   function jump(id){
     S.editing = null;
     if(isTask(id)){
@@ -1162,7 +1156,7 @@ button.act:disabled{opacity:.55;cursor:default}
       if(!t) return;
       S.tab = "ledger";
       if(!matchesKey(t, S.filter) || S.filter === "notes") S.filter = live(t) ? "open" : "done";
-      S.dirOpen[t.direction === "theirs" ? "theirs" : "mine"] = true;
+      S.dirOpen[dirOf(t)] = true;
       S.open = id;
       S.scrollTo = sel("data-open", id);
     } else {
@@ -1289,7 +1283,7 @@ button.act:disabled{opacity:.55;cursor:default}
       }
       return;
     }
-    if(d.cancelField){ delete S.fieldDraft[S.editing]; S.editing = null; S.dirPrompt = null; render(); return; }
+    if(d.cancelField){ cancelFieldEdit(); return; }
     if(d.saveField){ saveField(d.saveField, d.clear === "1"); return; }
   });
 
@@ -1318,7 +1312,7 @@ button.act:disabled{opacity:.55;cursor:default}
     } else if(e.key === "Enter" && (e.metaKey || e.ctrlKey) && e.target.matches(".field-editing textarea")){
       e.preventDefault(); saveField(e.target.dataset.fieldInput, false);
     } else if(e.key === "Escape" && e.target.matches(".field-editing input,.field-editing select,.field-editing textarea")){
-      delete S.fieldDraft[S.editing]; S.editing = null; S.dirPrompt = null; render();
+      cancelFieldEdit();
     }
   });
 
@@ -1430,8 +1424,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var task = isTask(id);
     var obj = task ? findTask(id) : findInbox(id);
     if(!obj) return;
-    var prevDir = obj.direction === "theirs" ? "theirs" : "mine";
-    if(prevDir === dir) return;
+    if(dirOf(obj) === dir) return;
     var now = nowIso();
     var prev = {direction: obj.direction || "mine"};
     var patch = {direction: dir};
