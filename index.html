@@ -508,6 +508,7 @@ button.act:disabled{opacity:.55;cursor:default}
   var NOTE_FIELDS = [["body","textarea"],["subject","select"]];
 
   /* ---------- helpers ---------- */
+  function $(id){ return document.getElementById(id); }
   function esc(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
@@ -580,8 +581,8 @@ button.act:disabled{opacity:.55;cursor:default}
   var toastTimer = null, toastUndo = null;
   function toast(msg, opts){
     opts = opts || {};
-    var el = document.getElementById("toast"), btn = document.getElementById("toastBtn");
-    document.getElementById("toastMsg").textContent = msg;
+    var el = $("toast"), btn = $("toastBtn");
+    $("toastMsg").textContent = msg;
     el.classList.toggle("error", !!opts.error);
     toastUndo = opts.undo || null;
     if(toastUndo){ btn.hidden = false; btn.textContent = "Undo"; }
@@ -591,8 +592,8 @@ button.act:disabled{opacity:.55;cursor:default}
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, opts.error ? 9000 : (toastUndo ? 6000 : 2600));
   }
-  function hideToast(){ document.getElementById("toast").classList.remove("show"); toastUndo = null; }
-  document.getElementById("toastBtn").addEventListener("click", function(){
+  function hideToast(){ $("toast").classList.remove("show"); toastUndo = null; }
+  $("toastBtn").addEventListener("click", function(){
     var fn = toastUndo; hideToast();
     if(fn) fn();
   });
@@ -601,26 +602,26 @@ button.act:disabled{opacity:.55;cursor:default}
   var sheetAction = null, sheetReturn = null;
   function confirmThen(title, bodyHtml, goLabel, fn){
     sheetAction = fn; sheetReturn = document.activeElement;
-    document.getElementById("sheetTitle").textContent = title;
-    document.getElementById("sheetBody").innerHTML = bodyHtml;
-    document.getElementById("sheetGo").textContent = goLabel;
-    document.getElementById("sheetBack").hidden = false;
-    document.getElementById("sheetCancel").focus();
+    $("sheetTitle").textContent = title;
+    $("sheetBody").innerHTML = bodyHtml;
+    $("sheetGo").textContent = goLabel;
+    $("sheetBack").hidden = false;
+    $("sheetCancel").focus();
   }
   function closeSheet(){
-    document.getElementById("sheetBack").hidden = true;
+    $("sheetBack").hidden = true;
     sheetAction = null;
     if(sheetReturn && document.body.contains(sheetReturn) && sheetReturn.focus) sheetReturn.focus();
     sheetReturn = null;
   }
-  document.getElementById("sheetCancel").addEventListener("click", function(e){ e.stopPropagation(); closeSheet(); });
-  document.getElementById("sheetGo").addEventListener("click", function(e){
+  $("sheetCancel").addEventListener("click", function(e){ e.stopPropagation(); closeSheet(); });
+  $("sheetGo").addEventListener("click", function(e){
     e.stopPropagation();
     var fn = sheetAction; closeSheet(); if(fn) fn();
   });
-  document.getElementById("sheetBack").addEventListener("click", function(e){ if(e.target === this) closeSheet(); });
+  $("sheetBack").addEventListener("click", function(e){ if(e.target === this) closeSheet(); });
   document.addEventListener("keydown", function(e){
-    if(e.key === "Escape" && !document.getElementById("sheetBack").hidden){ e.preventDefault(); closeSheet(); }
+    if(e.key === "Escape" && !$("sheetBack").hidden){ e.preventDefault(); closeSheet(); }
   });
 
   /* ---------- editable field ---------- */
@@ -757,7 +758,7 @@ button.act:disabled{opacity:.55;cursor:default}
     return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
   }
   function paintThemeBtn(){
-    var b = document.getElementById("themeBtn");
+    var b = $("themeBtn");
     if(b) b.innerHTML = effectiveTheme() === "dark" ? "&#9789;" : "&#9788;";
   }
   function initTheme(){
@@ -769,7 +770,7 @@ button.act:disabled{opacity:.55;cursor:default}
       var mq = window.matchMedia("(prefers-color-scheme: dark)");
       if(mq.addEventListener) mq.addEventListener("change", paintThemeBtn);
     }
-    document.getElementById("themeBtn").addEventListener("click", function(){
+    $("themeBtn").addEventListener("click", function(){
       var next = effectiveTheme() === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
       try{ window.localStorage.setItem("ledger-theme", next); }catch(e){}
@@ -781,7 +782,7 @@ button.act:disabled{opacity:.55;cursor:default}
   function greet(){
     var h = new Date().getHours();
     var word = h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Late one";
-    document.getElementById("greet").textContent = word;
+    $("greet").textContent = word;
   }
 
   function render(){
@@ -808,7 +809,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   function renderTally(){
-    var el = document.getElementById("tally");
+    var el = $("tally");
     if(!S.loaded){ el.textContent = S.connected ? "Reading your ledger\u2026" : (S.triedConnect ? "Can\u2019t reach your ledger" : "Connecting\u2026"); return; }
     var open = S.tasks.filter(live);
     var late = open.filter(isLate);
@@ -822,7 +823,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   function renderTabs(){
-    var el = document.getElementById("tabs");
+    var el = $("tabs");
     var appr = S.loaded ? approvals().length : 0;
     var openN = S.loaded ? S.tasks.filter(live).length : 0;
     el.innerHTML =
@@ -833,7 +834,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   function renderView(){
-    var el = document.getElementById("view");
+    var el = $("view");
     el.setAttribute("aria-labelledby", "tab-" + S.tab);
     if(!S.loaded){
       el.innerHTML = S.connected || !S.triedConnect
@@ -1141,7 +1142,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   function renderFoot(){
-    var el = document.getElementById("foot");
+    var el = $("foot");
     el.textContent = S.loaded ? "Changes save for everyone with access." : "";
   }
 
@@ -1170,10 +1171,10 @@ button.act:disabled{opacity:.55;cursor:default}
     if(S.tab === tab) return;
     S.tab = tab; S.editing = null; S.confirmAll = false;
     try{ window.localStorage.setItem("ledger-tab", tab); }catch(e){}
-    var bar = document.getElementById("tabsBar");
+    var bar = $("tabsBar");
     render();
     if(bar.classList.contains("stuck")){
-      var y = document.getElementById("sentinel").getBoundingClientRect().top + window.pageYOffset;
+      var y = $("sentinel").getBoundingClientRect().top + window.pageYOffset;
       window.scrollTo({top: y, behavior: "auto"});
     }
   }
@@ -1186,7 +1187,7 @@ button.act:disabled{opacity:.55;cursor:default}
 
     if(d.addNote){
       S.addingNote = true; S.editing = null; render();
-      var nb = document.getElementById("nn-body"); if(nb) nb.focus();
+      var nb = $("nn-body"); if(nb) nb.focus();
       return;
     }
     if(d.cancelNote){ S.addingNote = false; S.noteNew = {}; render(); return; }
@@ -1390,7 +1391,7 @@ button.act:disabled{opacity:.55;cursor:default}
 
   function saveNewNote(){
     if(!db) return;
-    var ta = document.getElementById("nn-body");
+    var ta = $("nn-body");
     var body = trim((ta ? ta.value : S.noteNew.body) || "");
     if(!body){ if(ta) ta.focus(); return; }
     var selEl = document.querySelector('[data-new-note="subject"]');
@@ -1584,8 +1585,8 @@ button.act:disabled{opacity:.55;cursor:default}
   /* ---------- sticky tab bar edge ---------- */
   if("IntersectionObserver" in window){
     new IntersectionObserver(function(entries){
-      document.getElementById("tabsBar").classList.toggle("stuck", !entries[0].isIntersecting);
-    }).observe(document.getElementById("sentinel"));
+      $("tabsBar").classList.toggle("stuck", !entries[0].isIntersecting);
+    }).observe($("sentinel"));
   }
 
   /* ---------- data ---------- */
