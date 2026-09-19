@@ -455,13 +455,29 @@ button.act:disabled{opacity:.55;cursor:default}
 .cap{background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--radius);padding:12px;margin-bottom:14px;box-shadow:var(--shadow)}
 .cap textarea{display:block;width:100%;box-sizing:border-box;min-height:52px;max-height:200px;font:inherit;font-size:16px;line-height:1.45;resize:none;background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong);border-radius:var(--radius-sm);padding:10px 11px}
 .cap textarea:focus{border-color:var(--mine);outline:none}
+.cap textarea[readonly]{background:var(--surface-sunk);color:var(--ink-soft)}
 .cap-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
-.cap-tog{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;min-height:40px}
-.cap-tog[hidden]{display:none}
-.cap-tog input{width:18px;height:18px;accent-color:var(--mine)}
+.sw{display:inline-flex;align-items:center;gap:10px;min-height:40px;padding:0;background:none;border:none;font:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer}
+.sw[hidden]{display:none}
+.sw-track{position:relative;flex:0 0 auto;width:38px;height:22px;border-radius:100px;background:var(--rule-strong);transition:background .15s}
+.sw-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.sw[aria-checked="true"] .sw-track{background:var(--mine)}
+.sw[aria-checked="true"] .sw-knob{transform:translateX(16px)}
 .cap-status{font-size:13px;color:var(--ink-soft);margin-top:8px;line-height:1.45}
 .cap-status:empty{display:none}
 .cap-link{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--mine);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.cap-draft{margin-top:10px}
+.cd{background:var(--surface-sunk);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px}
+.cd-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cd-x{width:34px;height:34px;border:none;border-radius:100px;background:none;color:var(--ink-faint);font-size:20px;line-height:1;cursor:pointer}
+.cd-x:hover{color:var(--late);background:var(--late-bg)}
+.cd input,.cd select,.cd textarea{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:16px;min-height:44px;padding:8px 10px;background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong);border-radius:var(--radius-sm)}
+.cd textarea{min-height:84px;resize:vertical}
+.cd input:focus,.cd select:focus,.cd textarea:focus{border-color:var(--mine);outline:none}
+.cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cd-grid label,.cd label.cd-wide{display:block;font-size:12px;font-weight:600;color:var(--ink-faint)}
+.cd-grid label input,.cd-grid label select{margin-top:4px;font-weight:400;color:var(--ink)}
+.cd-wide{grid-column:1 / -1}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -476,9 +492,10 @@ button.act:disabled{opacity:.55;cursor:default}
   </header>
   <section class="cap" id="cap" aria-label="Capture">
     <textarea id="capText" rows="2" maxlength="6000" placeholder="Tell the ledger what came up." aria-label="Capture a task or note"></textarea>
+    <div class="cap-draft" id="capDraft" hidden></div>
     <div class="cap-row">
-      <label class="cap-tog" id="capTog"><input type="checkbox" id="capRefine" checked> Refine with Claude</label>
-      <button type="button" class="act primary" id="capGo" disabled>Capture</button>
+      <button type="button" class="sw" id="capRefine" role="switch" aria-checked="true"><span class="sw-track"><span class="sw-knob"></span></span><span>Refine with Claude</span></button>
+      <button type="button" class="act primary" id="capGo" disabled>Refine</button>
     </div>
     <div class="cap-status" id="capStatus" role="status" aria-live="polite"></div>
   </section>
@@ -1604,16 +1621,42 @@ button.act:disabled{opacity:.55;cursor:default}
 
 
   /* ---------- capture box ---------- */
-  // Raw text goes to inbox first, unconditionally. Refining is a second, optional step that only edits that inbox item.
-  var sampleFn = null, capBusy = false;
-  var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine");
-  try{ if(window.localStorage.getItem("ledger-refine") === "0") capRefine.checked = false; }catch(e){}
-  capRefine.addEventListener("change", function(){
-    try{ window.localStorage.setItem("ledger-refine", capRefine.checked ? "1" : "0"); }catch(e){}
-  });
-  function capReady(){ capGo.disabled = !db || capBusy; }
-  function capSay(html){ capStatus.innerHTML = html; }
+  // Raw text goes to inbox only when you press Capture. Refine (optional) shows an editable draft first and writes nothing.
+  var sampleFn = null, capBusy = false, capMode = "raw", capDraft = [], capOrig = "";
+  var capDefault = true;
+  try{ if(window.localStorage.getItem("ledger-refine") === "0") capDefault = false; }catch(e){}
+  var capOn = capDefault;
+  var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine"), capDraftEl = $("capDraft");
   var REVIEW = ' <button type="button" class="cap-link" data-go="approve">Review</button>';
+  var BACK = ' <button type="button" class="cap-link" data-cap-back="1">Back to text</button>';
+
+  function capWantsRefine(){ return !!sampleFn && capOn; }
+  function updateCapUI(){
+    capRefine.hidden = !sampleFn;
+    capRefine.setAttribute("aria-checked", capOn ? "true" : "false");
+    capGo.textContent = capBusy ? "Working\u2026" : (capWantsRefine() ? (capMode === "draft" ? "Refine again" : "Refine") : "Capture");
+    capGo.disabled = !db || capBusy;
+    capRefine.disabled = capBusy;
+  }
+  function capReady(){ updateCapUI(); }
+  function capSay(html){ capStatus.innerHTML = html; }
+  function setToggle(on, persist){
+    capOn = !!on;
+    if(persist){
+      capDefault = capOn;
+      try{ window.localStorage.setItem("ledger-refine", capOn ? "1" : "0"); }catch(e){}
+    }
+    updateCapUI();
+  }
+  function leaveDraft(){
+    capDraft = []; capOrig = ""; capMode = "raw";
+    capText.readOnly = false;
+    capDraftEl.hidden = true; capDraftEl.innerHTML = "";
+    capOn = capDefault && !!sampleFn;
+    updateCapUI();
+  }
+
+  capRefine.addEventListener("click", function(){ if(!capBusy) setToggle(!capOn, true); });
   capText.addEventListener("input", function(){
     capText.style.height = "auto"; capText.style.height = Math.min(capText.scrollHeight + 2, 200) + "px";
   });
@@ -1621,6 +1664,12 @@ button.act:disabled{opacity:.55;cursor:default}
     if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); capture(); }
   });
   capGo.addEventListener("click", capture);
+  capStatus.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("[data-cap-back]") : null;
+    if(!b || capBusy) return;
+    leaveDraft(); capSay("");
+    capText.focus();
+  });
 
   function isoDay(d){
     function z(n){ return (n < 10 ? "0" : "") + n; }
@@ -1637,7 +1686,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(!text) return null;
     var subj = String(it.subject || "");
     if(!S.subjects.some(function(s){ return s.id === subj; })) subj = "";
-    if(kind === "note") return {kind: "note", title: "", body: trim(String(it.body || it.title)).slice(0, 2000), subject: subj};
+    if(kind === "note") return {kind: "note", body: trim(String(it.body || it.title)).slice(0, 2000), subject: subj};
     var due = String(it.due || "");
     return {
       kind: "task",
@@ -1651,11 +1700,11 @@ button.act:disabled{opacity:.55;cursor:default}
     };
   }
 
-  function refine(id, raw, created){
+  function buildPrompt(raw){
     var subs = S.subjects.filter(function(s){ return s.active !== false; })
       .map(function(s){ return {id: s.id, name: s.name}; });
     var t = today();
-    var prompt = [
+    return [
       "You are the intake step of a personal commitments ledger. Split the input into discrete items, one commitment or note per item, and return them as JSON.",
       "",
       "Today is " + isoDay(t) + " (" + t.toLocaleDateString("en-US", {weekday: "long"}) + ").",
@@ -1679,59 +1728,148 @@ button.act:disabled{opacity:.55;cursor:default}
       raw,
       ">>>"
     ].join("\n");
-    return sampleFn.json(prompt, {modelTier: "quick"}).then(function(out){
+  }
+
+  function sel2(opts, cur){
+    return opts.map(function(o){
+      return '<option value="' + o[0] + '"' + (o[0] === cur ? " selected" : "") + '>' + o[1] + '</option>';
+    }).join("");
+  }
+  function renderDraft(){
+    if(!capDraft.length){ capDraftEl.hidden = true; capDraftEl.innerHTML = ""; return; }
+    capDraftEl.hidden = false;
+    capDraftEl.innerHTML = capDraft.map(function(it, i){
+      var isNote = it.kind === "note";
+      var f = function(k){ return ' data-cap-f="' + k + '" data-i="' + i + '"'; };
+      var head = '<div class="cd-top"><span class="kind-tag ' + (isNote ? "is-note" : "is-mine") + '">' + (isNote ? "Note" : "Task") + '</span>' +
+        '<button type="button" class="cd-x" data-cap-rm="' + i + '" aria-label="Remove this item">&times;</button></div>';
+      if(isNote){
+        return '<div class="cd">' + head +
+          '<textarea' + f("body") + ' aria-label="Note">' + esc(it.body) + '</textarea>' +
+          '<div class="cd-grid"><label class="cd-wide">Subject<select' + f("subject") + '>' + subjectOptions(it.subject) + '</select></label></div>' +
+          '</div>';
+      }
+      return '<div class="cd">' + head +
+        '<input type="text"' + f("title") + ' value="' + esc(it.title) + '" placeholder="Title" aria-label="Title">' +
+        '<div class="cd-grid">' +
+          '<label>Direction<select' + f("direction") + '>' + sel2([["mine","I deliver"],["theirs","Owed to me"]], it.direction) + '</select></label>' +
+          '<label>Priority<select' + f("priority") + '>' + sel2([["normal","Normal"],["high","Urgent"],["low","Low"]], it.priority) + '</select></label>' +
+          '<label>With<input type="text"' + f("counterparty") + ' value="' + esc(it.counterparty) + '"></label>' +
+          '<label>Due<input type="date"' + f("due") + ' value="' + esc(it.due) + '"></label>' +
+          '<label class="cd-wide">Subject<select' + f("subject") + '>' + subjectOptions(it.subject) + '</select></label>' +
+          '<label class="cd-wide">Next step<input type="text"' + f("next_action") + ' value="' + esc(it.next_action) + '"></label>' +
+        '</div></div>';
+    }).join("");
+  }
+  function onDraftEdit(e){
+    var t = e.target;
+    if(!t || !t.dataset || !t.dataset.capF) return;
+    var it = capDraft[+t.dataset.i];
+    if(it) it[t.dataset.capF] = t.value;
+  }
+  capDraftEl.addEventListener("input", onDraftEdit);
+  capDraftEl.addEventListener("change", onDraftEdit);
+  capDraftEl.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("[data-cap-rm]") : null;
+    if(!b || capBusy) return;
+    capDraft.splice(+b.dataset.capRm, 1);
+    if(!capDraft.length){ leaveDraft(); capSay("Nothing left to capture. Your text is still in the box."); capText.focus(); return; }
+    renderDraft();
+    capSay(plural(capDraft.length, "item", "items") + " ready. Edit if needed, then Capture." + BACK);
+  });
+
+  // Refine: shows an editable draft. Writes nothing.
+  function doRefine(){
+    var raw = trim(capText.value);
+    if(!raw){ capText.focus(); return; }
+    capBusy = true; updateCapUI(); capSay("Refining with Claude\u2026");
+    sampleFn.json(buildPrompt(raw), {modelTier: "quick", cache: false}).then(function(out){
       var arr = Array.isArray(out) ? out : (out && Array.isArray(out.items) ? out.items : null);
       var items = (arr || []).slice(0, 8).map(cleanItem).filter(function(x){ return x; });
       if(!items.length) throw {code: "invalid_json"};
-      var chain = db.doc("inbox/" + id).update(Object.assign({unrefined: false}, items[0]));
-      items.slice(1).forEach(function(it, i){
-        chain = chain.then(function(){
-          return db.doc("inbox/" + newId("i_") + "x" + (i + 1)).set(Object.assign({
-            raw: raw, source: "typed on ledger page",
-            created: new Date(Date.parse(created) + i + 1).toISOString(), unrefined: false
-          }, it));
-        });
-      });
-      return chain.then(function(){ return items.length; });
-    });
+      capDraft = items; capOrig = raw; capMode = "draft";
+      capText.readOnly = true;
+      capOn = false; // refined: the button turns back into Capture
+      renderDraft();
+      capSay(plural(items.length, "item", "items") + " ready. Edit if needed, then Capture." + BACK);
+    }).catch(function(e){
+      var code = e && e.code;
+      if(code === "not_granted" || code === "sampling_disabled" || code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
+        sampleFn = null;
+        capSay("Refining isn\u2019t available here. Capture saves your text as typed.");
+      } else if(code === "rate_limited"){
+        capSay("Claude usage limit reached. Nothing was captured; turn Refine off to capture as typed.");
+      } else if(code === "cancelled"){
+        capSay("");
+      } else {
+        capSay("Couldn\u2019t refine. Nothing was captured; try again or turn Refine off to capture as typed.");
+      }
+    }).then(function(){ capBusy = false; updateCapUI(); });
   }
 
-  function capture(){
-    if(!db || capBusy) return;
+  function captureRaw(){
     var raw = trim(capText.value);
     if(!raw){ capText.focus(); return; }
     var now = nowIso(), id = newId("i_");
     var first = raw.replace(/\s+/g, " ");
     if(first.length > 90) first = first.slice(0, 89) + "\u2026";
-    capBusy = true; capReady(); capSay("Saving\u2026");
+    capBusy = true; updateCapUI(); capSay("Saving\u2026");
     db.doc("inbox/" + id).set({
       kind: "task", raw: raw, title: first, direction: "mine", counterparty: "", subject: "", due: "",
       priority: "normal", next_action: "", source: "typed on ledger page", created: now, unrefined: true
     }).then(function(){
       capText.value = ""; capText.style.height = "";
-      if(!(sampleFn && capRefine.checked)){
-        capBusy = false; capReady(); capSay("Queued 1." + REVIEW); return;
-      }
-      capSay("Queued. Refining with Claude\u2026");
-      return refine(id, raw, now).then(function(n){
-        capSay("Queued " + n + ", refined." + REVIEW);
-      }).catch(function(e){
-        var code = e && e.code;
-        if(code === "not_granted" || code === "sampling_disabled" || code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
-          sampleFn = null; $("capTog").hidden = true;
-          capSay("Queued 1 as typed. Refining isn\u2019t available here." + REVIEW);
-        } else if(code === "rate_limited"){
-          capSay("Queued 1 as typed. Claude usage limit reached, so it wasn\u2019t refined." + REVIEW);
-        } else {
-          capSay("Queued as typed. Refining failed; fix the details in To approve." + REVIEW);
-        }
-      }).then(function(){ capBusy = false; capReady(); });
+      capSay("Queued 1." + REVIEW);
     }, function(err){
-      capBusy = false; capReady();
       console.error("capture failed", err);
       capSay("Not saved. Your text is still in the box.");
-    });
+    }).then(function(){ capBusy = false; capOn = capDefault && !!sampleFn; updateCapUI(); });
   }
+
+  function captureDraft(){
+    for(var i = 0; i < capDraft.length; i++){
+      var it = capDraft[i];
+      if(it.kind === "note" ? !trim(it.body || "") : !trim(it.title || "")){
+        capSay("Item " + (i + 1) + " needs " + (it.kind === "note" ? "text" : "a title") + ", or remove it.");
+        var el = capDraftEl.querySelector('[data-i="' + i + '"][data-cap-f="' + (it.kind === "note" ? "body" : "title") + '"]');
+        if(el) el.focus();
+        return;
+      }
+    }
+    var items = capDraft.slice(), total = items.length, base = Date.now();
+    capBusy = true; updateCapUI(); capSay("Saving\u2026");
+    var chain = Promise.resolve();
+    items.forEach(function(it, i){
+      chain = chain.then(function(){
+        var created = new Date(base + i).toISOString();
+        var doc = it.kind === "note"
+          ? {kind: "note", raw: capOrig, body: trim(it.body), subject: it.subject || "", source: "typed on ledger page", created: created}
+          : {kind: "task", raw: capOrig, title: trim(it.title), direction: it.direction === "theirs" ? "theirs" : "mine",
+             counterparty: trim(it.counterparty || ""), subject: it.subject || "", due: validDay(it.due || "") ? it.due : "",
+             priority: it.priority || "normal", next_action: trim(it.next_action || ""),
+             source: "typed on ledger page", created: created, unrefined: false};
+        return db.doc("inbox/" + newId("i_") + "x" + i).set(doc).then(function(){ it._saved = true; });
+      });
+    });
+    chain.then(function(){
+      capText.value = ""; capText.style.height = "";
+      leaveDraft();
+      capSay("Queued " + total + "." + REVIEW);
+    }, function(err){
+      console.error("capture failed", err);
+      var left = capDraft.filter(function(x){ return !x._saved; });
+      var saved = total - left.length;
+      capDraft = left; renderDraft();
+      capSay((saved ? "Saved " + saved + " of " + total + ". " : "Not saved. ") + "The rest is still here; tap Capture to retry." + BACK);
+    }).then(function(){ capBusy = false; updateCapUI(); });
+  }
+
+  function capture(){
+    if(!db || capBusy) return;
+    if(capWantsRefine()){ doRefine(); return; }
+    if(capMode === "draft") captureDraft(); else captureRaw();
+  }
+  updateCapUI();
 
   /* ---------- sticky tab bar edge ---------- */
   if("IntersectionObserver" in window){
@@ -1769,9 +1907,10 @@ button.act:disabled{opacity:.55;cursor:default}
   if(window.claude && typeof window.claude.use === "function"){
     window.claude.use("sample").then(function(fn){
       sampleFn = (typeof fn === "function") ? fn : null;
-      if(!sampleFn) $("capTog").hidden = true;
-    }).catch(function(){ sampleFn = null; $("capTog").hidden = true; });
-  } else { $("capTog").hidden = true; }
+      if(!sampleFn) capOn = false;
+      updateCapUI();
+    }).catch(function(){ sampleFn = null; capOn = false; updateCapUI(); });
+  } else { sampleFn = null; capOn = false; updateCapUI(); }
 
   if(window.claude && typeof window.claude.use === "function"){
     window.claude.use("db").then(function(handle){
