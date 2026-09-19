@@ -450,6 +450,18 @@ button.act:disabled{opacity:.55;cursor:default}
   flex:0 0 auto;min-height:36px;padding:0 12px;border:none;border-radius:100px;cursor:pointer;
   background:transparent;color:inherit;font-weight:700;font-size:13.5px;text-decoration:underline;text-underline-offset:3px;
 }
+
+/* ---------- capture box ---------- */
+.cap{background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--radius);padding:12px;margin-bottom:14px;box-shadow:var(--shadow)}
+.cap textarea{display:block;width:100%;box-sizing:border-box;min-height:52px;max-height:200px;font:inherit;font-size:16px;line-height:1.45;resize:none;background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong);border-radius:var(--radius-sm);padding:10px 11px}
+.cap textarea:focus{border-color:var(--mine);outline:none}
+.cap-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.cap-tog{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-soft);cursor:pointer;min-height:40px}
+.cap-tog[hidden]{display:none}
+.cap-tog input{width:18px;height:18px;accent-color:var(--mine)}
+.cap-status{font-size:13px;color:var(--ink-soft);margin-top:8px;line-height:1.45}
+.cap-status:empty{display:none}
+.cap-link{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--mine);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -462,6 +474,14 @@ button.act:disabled{opacity:.55;cursor:default}
     </div>
     <button class="theme-btn" id="themeBtn" aria-label="Switch between light and dark">&#9788;</button>
   </header>
+  <section class="cap" id="cap" aria-label="Capture">
+    <textarea id="capText" rows="2" maxlength="6000" placeholder="Tell the ledger what came up." aria-label="Capture a task or note"></textarea>
+    <div class="cap-row">
+      <label class="cap-tog" id="capTog"><input type="checkbox" id="capRefine" checked> Refine with Claude</label>
+      <button type="button" class="act primary" id="capGo" disabled>Capture</button>
+    </div>
+    <div class="cap-status" id="capStatus" role="status" aria-live="polite"></div>
+  </section>
   <div class="tabs-sentinel" id="sentinel"></div>
   <nav class="tabs-bar" id="tabsBar"><div class="tabs" id="tabs" role="tablist" aria-label="Sections"></div></nav>
   <main id="view" role="tabpanel"><div class="skel"></div><div class="skel"></div><div class="skel"></div></main>
@@ -1582,6 +1602,137 @@ button.act:disabled{opacity:.55;cursor:default}
     toast("That change didn\u2019t save. Check your connection and try again.", {error: true});
   }
 
+
+  /* ---------- capture box ---------- */
+  // Raw text goes to inbox first, unconditionally. Refining is a second, optional step that only edits that inbox item.
+  var sampleFn = null, capBusy = false;
+  var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine");
+  try{ if(window.localStorage.getItem("ledger-refine") === "0") capRefine.checked = false; }catch(e){}
+  capRefine.addEventListener("change", function(){
+    try{ window.localStorage.setItem("ledger-refine", capRefine.checked ? "1" : "0"); }catch(e){}
+  });
+  function capReady(){ capGo.disabled = !db || capBusy; }
+  function capSay(html){ capStatus.innerHTML = html; }
+  var REVIEW = ' <button type="button" class="cap-link" data-go="approve">Review</button>';
+  capText.addEventListener("input", function(){
+    capText.style.height = "auto"; capText.style.height = Math.min(capText.scrollHeight + 2, 200) + "px";
+  });
+  capText.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); capture(); }
+  });
+  capGo.addEventListener("click", capture);
+
+  function isoDay(d){
+    function z(n){ return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate());
+  }
+  function validDay(s){
+    var d = parseDay(s);
+    return !!d && isoDay(d) === String(s).slice(0, 10) && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  }
+  function cleanItem(it){
+    if(!it || typeof it !== "object") return null;
+    var kind = it.kind === "note" ? "note" : "task";
+    var text = trim(String(it.title || it.body || ""));
+    if(!text) return null;
+    var subj = String(it.subject || "");
+    if(!S.subjects.some(function(s){ return s.id === subj; })) subj = "";
+    if(kind === "note") return {kind: "note", title: "", body: trim(String(it.body || it.title)).slice(0, 2000), subject: subj};
+    var due = String(it.due || "");
+    return {
+      kind: "task",
+      title: text.slice(0, 140),
+      direction: it.direction === "theirs" ? "theirs" : "mine",
+      counterparty: trim(String(it.counterparty || "")).slice(0, 60),
+      subject: subj,
+      due: validDay(due) ? due : "",
+      priority: it.priority === "high" || it.priority === "low" ? it.priority : "normal",
+      next_action: trim(String(it.next_action || "")).slice(0, 200)
+    };
+  }
+
+  function refine(id, raw, created){
+    var subs = S.subjects.filter(function(s){ return s.active !== false; })
+      .map(function(s){ return {id: s.id, name: s.name}; });
+    var t = today();
+    var prompt = [
+      "You are the intake step of a personal commitments ledger. Split the input into discrete items, one commitment or note per item, and return them as JSON.",
+      "",
+      "Today is " + isoDay(t) + " (" + t.toLocaleDateString("en-US", {weekday: "long"}) + ").",
+      "Subjects (use the id, or \"\" if none fits): " + JSON.stringify(subs),
+      "",
+      "Rules:",
+      "- kind: \"task\" if someone must do something; \"note\" if it is only information worth keeping.",
+      "- title: imperative, specific, under 12 words. Keep the user's own wording where possible. Do not editorialise.",
+      "- direction: \"mine\" if the user owes it; \"theirs\" if someone owes it to the user.",
+      "- counterparty: a person or team, plain name; \"\" if none.",
+      "- due: YYYY-MM-DD only if the input states or clearly implies a date (resolve relative dates from today). Otherwise \"\". Never invent a date. If the input says to leave a date or timeline out, leave it out.",
+      "- priority: \"high\" only if urgency is stated, else \"normal\".",
+      "- next_action: only if stated, else \"\".",
+      "- Do not drop anything the input contains.",
+      "",
+      "Reply with only a JSON array, for example:",
+      "[{\"kind\":\"task\",\"title\":\"Send Priya the draft\",\"direction\":\"mine\",\"counterparty\":\"Priya\",\"subject\":\"\",\"due\":\"\",\"priority\":\"normal\",\"next_action\":\"\"}]",
+      "",
+      "Input:",
+      "<<<",
+      raw,
+      ">>>"
+    ].join("\n");
+    return sampleFn.json(prompt, {modelTier: "quick"}).then(function(out){
+      var arr = Array.isArray(out) ? out : (out && Array.isArray(out.items) ? out.items : null);
+      var items = (arr || []).slice(0, 8).map(cleanItem).filter(function(x){ return x; });
+      if(!items.length) throw {code: "invalid_json"};
+      var chain = db.doc("inbox/" + id).update(Object.assign({unrefined: false}, items[0]));
+      items.slice(1).forEach(function(it, i){
+        chain = chain.then(function(){
+          return db.doc("inbox/" + newId("i_") + "x" + (i + 1)).set(Object.assign({
+            raw: raw, source: "typed on ledger page",
+            created: new Date(Date.parse(created) + i + 1).toISOString(), unrefined: false
+          }, it));
+        });
+      });
+      return chain.then(function(){ return items.length; });
+    });
+  }
+
+  function capture(){
+    if(!db || capBusy) return;
+    var raw = trim(capText.value);
+    if(!raw){ capText.focus(); return; }
+    var now = nowIso(), id = newId("i_");
+    var first = raw.replace(/\s+/g, " ");
+    if(first.length > 90) first = first.slice(0, 89) + "\u2026";
+    capBusy = true; capReady(); capSay("Saving\u2026");
+    db.doc("inbox/" + id).set({
+      kind: "task", raw: raw, title: first, direction: "mine", counterparty: "", subject: "", due: "",
+      priority: "normal", next_action: "", source: "typed on ledger page", created: now, unrefined: true
+    }).then(function(){
+      capText.value = ""; capText.style.height = "";
+      if(!(sampleFn && capRefine.checked)){
+        capBusy = false; capReady(); capSay("Queued 1." + REVIEW); return;
+      }
+      capSay("Queued. Refining with Claude\u2026");
+      return refine(id, raw, now).then(function(n){
+        capSay("Queued " + n + ", refined." + REVIEW);
+      }).catch(function(e){
+        var code = e && e.code;
+        if(code === "not_granted" || code === "sampling_disabled" || code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
+          sampleFn = null; $("capTog").hidden = true;
+          capSay("Queued 1 as typed. Refining isn\u2019t available here." + REVIEW);
+        } else if(code === "rate_limited"){
+          capSay("Queued 1 as typed. Claude usage limit reached, so it wasn\u2019t refined." + REVIEW);
+        } else {
+          capSay("Queued as typed. Refining failed; fix the details in To approve." + REVIEW);
+        }
+      }).then(function(){ capBusy = false; capReady(); });
+    }, function(err){
+      capBusy = false; capReady();
+      console.error("capture failed", err);
+      capSay("Not saved. Your text is still in the box.");
+    });
+  }
+
   /* ---------- sticky tab bar edge ---------- */
   if("IntersectionObserver" in window){
     new IntersectionObserver(function(entries){
@@ -1616,10 +1767,18 @@ button.act:disabled{opacity:.55;cursor:default}
   render();
 
   if(window.claude && typeof window.claude.use === "function"){
+    window.claude.use("sample").then(function(fn){
+      sampleFn = (typeof fn === "function") ? fn : null;
+      if(!sampleFn) $("capTog").hidden = true;
+    }).catch(function(){ sampleFn = null; $("capTog").hidden = true; });
+  } else { $("capTog").hidden = true; }
+
+  if(window.claude && typeof window.claude.use === "function"){
     window.claude.use("db").then(function(handle){
       S.triedConnect = true;
       if(!handle){ S.connected = false; S.loaded = false; render(); return; }
       db = handle; S.connected = true;
+      capReady();
       subscribe("subjects", "subjects");
       subscribe("tasks", "tasks");
       subscribe("notes", "notes");
