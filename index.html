@@ -468,7 +468,8 @@ button.act:disabled{opacity:.55;cursor:default}
 .cap-link{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--mine);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .cap-draft{margin-top:10px}
 .cd{background:var(--surface-sunk);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px}
-.cd-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cd-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.cd-top .seg{width:170px;flex:0 0 auto}
 .cd-x{width:34px;height:34px;border:none;border-radius:100px;background:none;color:var(--ink-faint);font-size:20px;line-height:1;cursor:pointer}
 .cd-x:hover{color:var(--late);background:var(--late-bg)}
 .cd input,.cd select,.cd textarea{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:16px;min-height:44px;padding:8px 10px;background:var(--surface);color:var(--ink);border:1px solid var(--rule-strong);border-radius:var(--radius-sm)}
@@ -1686,11 +1687,11 @@ button.act:disabled{opacity:.55;cursor:default}
     if(!text) return null;
     var subj = String(it.subject || "");
     if(!S.subjects.some(function(s){ return s.id === subj; })) subj = "";
-    if(kind === "note") return {kind: "note", body: trim(String(it.body || it.title)).slice(0, 2000), subject: subj};
     var due = String(it.due || "");
     return {
-      kind: "task",
-      title: text.slice(0, 140),
+      kind: kind,
+      title: kind === "note" ? "" : text.slice(0, 140),
+      body: trim(String(it.body || it.title || "")).slice(0, 2000),
       direction: it.direction === "theirs" ? "theirs" : "mine",
       counterparty: trim(String(it.counterparty || "")).slice(0, 60),
       subject: subj,
@@ -1711,7 +1712,7 @@ button.act:disabled{opacity:.55;cursor:default}
       "Subjects (use the id, or \"\" if none fits): " + JSON.stringify(subs),
       "",
       "Rules:",
-      "- kind: \"task\" if someone must do something; \"note\" if it is only information worth keeping.",
+      "- kind: default to \"task\". Use \"task\" whenever anyone needs to do, send, follow up, decide, check, deliver or wait on something. Use \"note\" only for pure information with no action. When unsure, choose \"task\".",
       "- title: imperative, specific, under 12 words. Keep the user's own wording where possible. Do not editorialise.",
       "- direction: \"mine\" if the user owes it; \"theirs\" if someone owes it to the user.",
       "- counterparty: a person or team, plain name; \"\" if none.",
@@ -1741,7 +1742,13 @@ button.act:disabled{opacity:.55;cursor:default}
     capDraftEl.innerHTML = capDraft.map(function(it, i){
       var isNote = it.kind === "note";
       var f = function(k){ return ' data-cap-f="' + k + '" data-i="' + i + '"'; };
-      var head = '<div class="cd-top"><span class="kind-tag ' + (isNote ? "is-note" : "is-mine") + '">' + (isNote ? "Note" : "Task") + '</span>' +
+      var typeSw = '<div class="seg seg-dir cd-type" role="group" aria-label="Type">' +
+        [["task","Task"],["note","Note"]].map(function(o){
+          var on = it.kind === o[0];
+          return '<button type="button" aria-pressed="' + (on ? "true" : "false") + '"' +
+            (on ? "" : ' data-cap-kind="' + o[0] + '|' + i + '"') + '>' + o[1] + '</button>';
+        }).join("") + '</div>';
+      var head = '<div class="cd-top">' + typeSw +
         '<button type="button" class="cd-x" data-cap-rm="' + i + '" aria-label="Remove this item">&times;</button></div>';
       if(isNote){
         return '<div class="cd">' + head +
@@ -1765,11 +1772,31 @@ button.act:disabled{opacity:.55;cursor:default}
     var t = e.target;
     if(!t || !t.dataset || !t.dataset.capF) return;
     var it = capDraft[+t.dataset.i];
-    if(it) it[t.dataset.capF] = t.value;
+    if(!it) return;
+    it[t.dataset.capF] = t.value;
+    if(t.dataset.capF === "body") it._bodyEdited = true;
+    if(t.dataset.capF === "title") it._titleEdited = true;
+  }
+  // Switching keeps every field, so switching back loses nothing.
+  function switchKind(it, to){
+    if(to === "note"){
+      if(!it._bodyEdited && trim(it.title || "")) it.body = it.title;
+      it.kind = "note";
+    } else {
+      if(!it._titleEdited && trim(it.body || "")) it.title = trim(it.body.replace(/\s+/g, " ")).slice(0, 90);
+      it.kind = "task";
+    }
   }
   capDraftEl.addEventListener("input", onDraftEdit);
   capDraftEl.addEventListener("change", onDraftEdit);
   capDraftEl.addEventListener("click", function(e){
+    var kb = e.target.closest ? e.target.closest("[data-cap-kind]") : null;
+    if(kb){
+      if(capBusy) return;
+      var kp = kb.dataset.capKind.split("|"), ki = capDraft[+kp[1]];
+      if(ki){ switchKind(ki, kp[0]); renderDraft(); }
+      return;
+    }
     var b = e.target.closest ? e.target.closest("[data-cap-rm]") : null;
     if(!b || capBusy) return;
     capDraft.splice(+b.dataset.capRm, 1);
@@ -1782,8 +1809,8 @@ button.act:disabled{opacity:.55;cursor:default}
   function doRefine(){
     var raw = trim(capText.value);
     if(!raw){ capText.focus(); return; }
-    capBusy = true; updateCapUI(); capSay("Refining with Claude\u2026");
-    sampleFn.json(buildPrompt(raw), {modelTier: "quick", cache: false}).then(function(out){
+    capBusy = true; updateCapUI(); capSay("Refining with Claude\u2026 this can take up to a minute.");
+    sampleFn.json(buildPrompt(raw), {cache: false}).then(function(out){
       var arr = Array.isArray(out) ? out : (out && Array.isArray(out.items) ? out.items : null);
       var items = (arr || []).slice(0, 8).map(cleanItem).filter(function(x){ return x; });
       if(!items.length) throw {code: "invalid_json"};
