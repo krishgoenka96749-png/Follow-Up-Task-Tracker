@@ -66,7 +66,7 @@ python3 dev/server.py   # http://localhost:8000 — open this, not index.html di
 
 1. Commit small, one logical change each. Message style: `Area: what changed` (see `git log`).
 2. `git push origin main`.
-3. Republish the artifact. From the Claude desktop app (Code tab) Claude *can* publish: use the Artifact tool with `url` = the live artifact URL and `file_path` = this repo's `index.html`. The tool refuses until the live version has been read in full (`action: "read"`, then Read every line of the saved file), so diff the live source against `index.html` first to confirm nothing published-only gets overwritten. From a plain CLI session without the Artifact tool, ask in the claude.ai project for this app: "pull main and republish".
+3. Republish the artifact. From the Claude desktop app (Code tab) Claude *can* publish: use the Artifact tool with `url` = the live artifact URL and `file_path` = this repo's `index.html`. The tool refuses until the live version has been read in full (`action: "read"`, then Read every line of the saved file), so diff the live source against `index.html` first to confirm nothing published-only gets overwritten. From a plain CLI session without the Artifact tool, ask in the claude.ai "Follow Up Tracker" project: "pull main and republish".
    - Republish without a `capabilities` argument so the stored `db` + `sample` declaration carries forward. Never pass `{}`.
    - Do not bump the runtime contract (currently 0.2.52) as a side effect.
 4. Before pushing anything that changes the data shape, update `docs/SPEC.md`. Existing docs in the db are live; migrations must be additive or handled in code.
@@ -77,8 +77,8 @@ Last published: 2026-09-20, artifact version 22 (Task/Note switch; title now "Fo
 
 Krish sometimes still says "the ledger". It means this project. Nothing in the page, dev harness or docs uses that word any more except these deliberate leftovers:
 
-- **claude.ai project name** — still "Ledger" until Krish renames it in claude.ai (Claude can't). Chat-side capture instructions there are `docs/SPEC.md`.
-- **Old path** `~/Downloads/Sandboxes/ledger/` — gone. A CLI session named `ledger-18` may still point at it; close it.
+- **claude.ai project** — named "Follow Up Tracker" (it never had the old name; earlier docs wrongly said it did). Its chat-side instructions are copied in `docs/SPEC.md`.
+- **Old path** `~/Downloads/Sandboxes/ledger/` — gone. (The CLI session `ledger-18` that pointed at it was closed 2026-09-20.)
 - **Old records in the db** — `source` says "typed on ledger page" / "added on the ledger page"; task `history` lines say "from the ledger page". New ones say "tracker page". Same meaning; don't migrate.
 - **Old localStorage keys** `ledger-*` — read once as a fallback in `lsGet`, never written.
 - **Git history** — early commits say "Ledger". Don't rewrite.

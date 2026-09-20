@@ -1,6 +1,6 @@
 # Follow Up Task Tracker — behaviour spec and data model
 
-Source: the Claude project instructions for the Follow Up Task Tracker project (in claude.ai), copied here so the page and the spec live together. If the two ever disagree, fix whichever is wrong and note it under "Known drift".
+Source: the Claude project instructions for the "Follow Up Tracker" project in claude.ai, copied here so the page and the spec live together. If the two ever disagree, fix whichever is wrong and note it under "Known drift".
 
 ## What it is
 
