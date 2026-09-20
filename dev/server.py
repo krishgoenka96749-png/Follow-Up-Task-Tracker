@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local dev server for the Ledger page.
+"""Local dev server for the Follow Up Task Tracker page (formerly "Ledger").
 
 Serves index.html untouched on disk, with dev/seed.js + dev/mock-claude.js
 injected into <head> on the way out, so window.claude exists before the page's

@@ -1,6 +1,6 @@
 # Follow Up Task Tracker — Claude Code context
 
-Personal commitments ledger for Krish. Project name: **Follow Up Task Tracker** (was "Ledger" until 2026-09-20; the in-page "Ledger" tab and the claude.ai project name are unchanged). Lives at `~/Downloads/Sandboxes/General Projects/Follow Up Task Tracker/`. Raw input (typed, dictated, pasted WhatsApp, meeting transcripts) becomes structured tasks, follow-ups and notes. Bookkeeping is the job; analysis and drafting only on request.
+Personal commitments ledger for Krish. Project name: **Follow Up Task Tracker** (was "Ledger" until 2026-09-20; the in-page "Ledger" tab and the claude.ai project name are unchanged). **Krish still says "the ledger"** — it means this project; the old path `Sandboxes/ledger/` no longer exists. Lives at `~/Downloads/Sandboxes/General Projects/Follow Up Task Tracker/`. Raw input (typed, dictated, pasted WhatsApp, meeting transcripts) becomes structured tasks, follow-ups and notes. Bookkeeping is the job; analysis and drafting only on request.
 
 This repo is the **page** (the UI). The data lives in the claude.ai Artifact's `db`, not here.
 
@@ -61,14 +61,16 @@ python3 dev/server.py   # http://localhost:8000 — open this, not index.html di
 
 `?fresh` reseeds, `?db=none` gives the disconnected state, `?sample=none` hides Refine, `?sample=<code>` makes the next refine fail. `window.__ledgerMock` has `dump()`, `reset()`, `failNext(code)`, `fail(code)`. Details in `dev/README.md`; the real API it imitates is in `docs/contract/`.
 
-## Shipping (Claude Code cannot publish artifacts)
+## Shipping
 
 1. Commit small, one logical change each. Message style: `Area: what changed` (see `git log`).
 2. `git push origin main`.
-3. In a Claude chat in the Ledger project: "pull main and republish". Claude publishes the repo's `index.html` to the same artifact URL.
+3. Republish the artifact. From the Claude desktop app (Code tab) Claude *can* publish: use the Artifact tool with `url` = the live artifact URL and `file_path` = this repo's `index.html`. The tool refuses until the live version has been read in full (`action: "read"`, then Read every line of the saved file), so diff the live source against `index.html` first to confirm nothing published-only gets overwritten. From a plain CLI session without the Artifact tool, ask in the claude.ai Ledger project: "pull main and republish".
    - Republish without a `capabilities` argument so the stored `db` + `sample` declaration carries forward. Never pass `{}`.
    - Do not bump the runtime contract (currently 0.2.52) as a side effect.
 4. Before pushing anything that changes the data shape, update `docs/SPEC.md`. Existing docs in the db are live; migrations must be additive or handled in code.
+
+Last published: 2026-09-20, artifact version 22 (Task/Note switch; title now "Follow Up Task Tracker").
 
 ## Working with Krish
 
