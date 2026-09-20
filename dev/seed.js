@@ -18,7 +18,7 @@
   }
 
   /* path -> document body, exactly as the real db would hold it. */
-  window.__LEDGER_SEED__ = {
+  window.__TRACKER_SEED__ = {
 
     /* ---------- subjects ---------- */
     "subjects/aquaterra": {name: "AquaTerra", order: 1, active: true, note: "Scope refresh, Q4 delivery"},
@@ -106,7 +106,7 @@
     },
     "notes/n_ge01": {
       body: "Rahul prefers a one-pager over a deck. Ask before building slides next time.",
-      subject: "deloitte", task_id: "", created: at(-2, 12), source: "added on the ledger page"
+      subject: "deloitte", task_id: "", created: at(-2, 12), source: "added on the tracker page"
     },
 
     /* ---------- inbox: pending approval ---------- */
@@ -128,26 +128,26 @@
       kind: "note", raw: "note - the borewell dataset they sent last year was in a pdf, ask for csv this time",
       body: "The borewell dataset came as a PDF last year — ask for CSV this time.",
       subject: "aquaterra",
-      source: "typed on ledger page", created: at(0, 10)
+      source: "typed on tracker page", created: at(0, 10)
     },
     "inbox/i_pend4": {
       kind: "task", raw: "call the accountant about the advance tax thing before the 15th",
       title: "Call the accountant about the advance tax thing before the 15th",
       direction: "mine", counterparty: "", subject: "", due: "",
       priority: "normal", next_action: "",
-      source: "typed on ledger page", created: at(0, 11), unrefined: true
+      source: "typed on tracker page", created: at(0, 11), unrefined: true
     },
 
     /* ---------- inbox: edits (never filed from the page) ---------- */
     "inbox/i_edit1": {
       kind: "edit", raw: "Priya says Thursday works better for the scope note",
       task_id: "t_aq01", inbox_id: "",
-      source: "typed on ledger page", created: at(0, 12)
+      source: "typed on tracker page", created: at(0, 12)
     },
     "inbox/i_edit2": {
       kind: "edit", raw: "she's presenting on Tuesday not Monday, so bring it forward",
       task_id: "", inbox_id: "i_pend1",
-      source: "typed on ledger page", created: at(0, 13)
+      source: "typed on tracker page", created: at(0, 13)
     }
   };
 })();

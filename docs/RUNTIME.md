@@ -39,7 +39,7 @@ window.claude.use("sample").then(function(sample){
 - Stylesheets only from `fonts.googleapis.com` (font files from `fonts.gstatic.com`). Everything else is blocked silently.
 - No `fetch`/XHR to other origins. No remote images. Inline everything else (data: URIs).
 - The direct Anthropic API call and `window.storage` that work in the chat preview do **not** work in a published page.
-- `localStorage` works, per viewer, per artifact. In use for UI prefs only: `ledger-tab`, `ledger-dirs`, `ledger-refine`, `ledger-theme`. Always wrapped in try/catch.
+- `localStorage` works, per viewer, per artifact. In use for UI prefs only: `tracker-tab`, `tracker-dirs`, `tracker-refine`, `tracker-theme` (the page still reads the pre-rename `ledger-*` keys once as a fallback so nobody loses their settings). Always wrapped in try/catch.
 - Plain download links and script-started saves are inert; a file save needs the `downloads` capability (not declared).
 - File size cap 16 MB (page is ~117 kB).
 

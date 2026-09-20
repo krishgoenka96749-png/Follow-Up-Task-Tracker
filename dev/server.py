@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local dev server for the Follow Up Task Tracker page (formerly "Ledger").
+"""Local dev server for the Follow Up Task Tracker page.
 
 Serves index.html untouched on disk, with dev/seed.js + dev/mock-claude.js
 injected into <head> on the way out, so window.claude exists before the page's
@@ -73,7 +73,7 @@ def main():
     handler = functools.partial(Handler, directory=ROOT)
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", port), handler) as httpd:
-        print(f"Ledger dev harness -> http://localhost:{port}/  (Ctrl-C to stop)")
+        print(f"Follow Up Task Tracker dev harness -> http://localhost:{port}/  (Ctrl-C to stop)")
         print("  ?fresh reseeds · ?db=none disconnected · ?sample=none hides Refine")
         try:
             httpd.serve_forever()

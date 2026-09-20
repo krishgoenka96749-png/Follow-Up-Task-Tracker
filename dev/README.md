@@ -33,10 +33,10 @@ script runs.
 ## Console handle
 
 ```js
-__ledgerMock.dump()          // every document, by path
-__ledgerMock.reset()         // reseed and reload
-__ledgerMock.failNext("invalid_json")   // break the next refine
-__ledgerMock.fail("unavailable")        // break every db write; fail(null) restores
+__trackerMock.dump()          // every document, by path
+__trackerMock.reset()         // reseed and reload
+__trackerMock.failNext("invalid_json")   // break the next refine
+__trackerMock.fail("unavailable")        // break every db write; fail(null) restores
 ```
 
 ## What the mock is faithful about
@@ -47,7 +47,7 @@ missing document rejecting `invalid_argument`, frozen snapshot bodies with the
 same object identity while a document is unchanged, `docChanges()`,
 `where`/`orderBy`/`limit`, latency-compensated delivery (`hasPendingWrites`),
 and `{code, message}` rejections. State persists in `localStorage`
-(`ledger-dev-db`) so a reload keeps what you filed.
+(`tracker-dev-db`) so a reload keeps what you filed.
 
 ## What it is not
 

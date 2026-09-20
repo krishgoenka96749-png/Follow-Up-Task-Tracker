@@ -18,7 +18,7 @@
      ?latency=<ms>     write/round-trip latency, default 60
      ?slow=<ms>        extra delay on sample.json, default 700
 
-   Console handle: window.__ledgerMock
+   Console handle: window.__trackerMock
      .dump()           every document, by path
      .reset()          reseed and reload
      .failNext(code)   make the next sample.json reject
@@ -30,7 +30,7 @@
   var params   = new URLSearchParams(window.location.search);
   var LATENCY  = Number(params.get("latency") || 60);
   var SAMPLE_MS= Number(params.get("slow") || 700);
-  var STORE_KEY= "ledger-dev-db";
+  var STORE_KEY= "tracker-dev-db";
 
   function log(){
     var args = ["%c[mock]", "color:#1E685C;font-weight:600"].concat([].slice.call(arguments));
@@ -81,7 +81,7 @@
   }
   function seed(){
     store = {};
-    var s = window.__LEDGER_SEED__ || {};
+    var s = window.__TRACKER_SEED__ || {};
     Object.keys(s).forEach(function(p){ store[p] = deepFreeze(clone(s[p])); });
     persist();
     log("seeded", Object.keys(store).length, "documents");
@@ -514,7 +514,7 @@
     }
   });
 
-  window.__ledgerMock = {
+  window.__trackerMock = {
     dump: function(){ return clone(store); },
     reset: function(){
       try{ window.localStorage.removeItem(STORE_KEY); }catch(e){}
@@ -525,5 +525,5 @@
     store: function(){ return store; }
   };
 
-  log("ready — window.__ledgerMock for the handles, ?fresh to reseed");
+  log("ready — window.__trackerMock for the handles, ?fresh to reseed");
 })();

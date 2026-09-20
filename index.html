@@ -499,7 +499,7 @@ button.act:disabled{opacity:.55;cursor:default}
       <button type="button" data-cap-as="task" aria-pressed="true">Task</button>
       <button type="button" data-cap-as="note" aria-pressed="false">Note</button>
     </div></div>
-    <textarea id="capText" rows="2" maxlength="6000" placeholder="Tell the ledger what came up." aria-label="Capture a task or note"></textarea>
+    <textarea id="capText" rows="2" maxlength="6000" placeholder="What came up? Add a task or a note." aria-label="Capture a task or note"></textarea>
     <div class="cap-draft" id="capDraft" hidden></div>
     <div class="cap-row">
       <button type="button" class="sw" id="capRefine" role="switch" aria-checked="true"><span class="sw-track"><span class="sw-knob"></span></span><span>Refine with Claude</span></button>
@@ -532,13 +532,14 @@ button.act:disabled{opacity:.55;cursor:default}
   var S = {
     tasks: [], notes: [], subjects: [], inbox: [],
     filter: "open", open: null, openPend: null, editing: null, loaded: false, connected: false,
-    tab: "ledger", dirOpen: {mine: true, theirs: true}, confirmAll: false, openNote: null, addingNote: false, noteNew: {}, drafts: {}, fieldDraft: {}, logAll: {}, deferred: false, scrollTo: null,
+    tab: "tasks", dirOpen: {mine: true, theirs: true}, confirmAll: false, openNote: null, addingNote: false, noteNew: {}, drafts: {}, fieldDraft: {}, logAll: {}, deferred: false, scrollTo: null,
     dirPrompt: null, triedConnect: false
   };
   try{
-    var savedTab = window.localStorage.getItem("ledger-tab");
-    if(savedTab === "approve" || savedTab === "ledger") S.tab = savedTab;
-    var savedDirs = JSON.parse(window.localStorage.getItem("ledger-dirs") || "null");
+    var savedTab = lsGet("tracker-tab", "ledger-tab");
+    if(savedTab === "ledger") savedTab = "tasks"; // value stored before the 2026-09-20 rename
+    if(savedTab === "approve" || savedTab === "tasks") S.tab = savedTab;
+    var savedDirs = JSON.parse(lsGet("tracker-dirs", "ledger-dirs") || "null");
     if(savedDirs && typeof savedDirs === "object") S.dirOpen = {mine: savedDirs.mine !== false, theirs: savedDirs.theirs !== false};
   }catch(e){}
 
@@ -553,6 +554,11 @@ button.act:disabled{opacity:.55;cursor:default}
   var NOTE_FIELDS = [["body","textarea"],["subject","select"]];
 
   /* ---------- helpers ---------- */
+  // Per-viewer prefs. Reads fall back to the pre-rename "ledger-*" key so nobody loses their settings; writes use "tracker-*".
+  function lsGet(key, oldKey){
+    var v = window.localStorage.getItem(key);
+    return v === null && oldKey ? window.localStorage.getItem(oldKey) : v;
+  }
   function $(id){ return document.getElementById(id); }
   function esc(s){
     return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -808,7 +814,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
   function initTheme(){
     var t = null;
-    try{ t = window.localStorage.getItem("ledger-theme"); }catch(e){}
+    try{ t = lsGet("tracker-theme", "ledger-theme"); }catch(e){}
     if(t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
     paintThemeBtn();
     if(window.matchMedia){
@@ -818,7 +824,7 @@ button.act:disabled{opacity:.55;cursor:default}
     $("themeBtn").addEventListener("click", function(){
       var next = effectiveTheme() === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
-      try{ window.localStorage.setItem("ledger-theme", next); }catch(e){}
+      try{ window.localStorage.setItem("tracker-theme", next); }catch(e){}
       paintThemeBtn();
     });
   }
@@ -855,14 +861,14 @@ button.act:disabled{opacity:.55;cursor:default}
 
   function renderTally(){
     var el = $("tally");
-    if(!S.loaded){ el.textContent = S.connected ? "Reading your ledger\u2026" : (S.triedConnect ? "Can\u2019t reach your ledger" : "Connecting\u2026"); return; }
+    if(!S.loaded){ el.textContent = S.connected ? "Reading your tasks\u2026" : (S.triedConnect ? "Can\u2019t reach your tracker" : "Connecting\u2026"); return; }
     var open = S.tasks.filter(live);
     var late = open.filter(isLate);
     var appr = approvals().length;
-    if(!open.length && !appr){ el.textContent = "Your ledger is clear."; return; }
+    if(!open.length && !appr){ el.textContent = "Your tracker is clear."; return; }
     var bits = [];
-    if(late.length) bits.push('<button class="tally-btn late" data-go="ledger|late">' + late.length + ' overdue</button>');
-    bits.push('<button class="tally-btn" data-go="ledger|open">' + open.length + ' open</button>');
+    if(late.length) bits.push('<button class="tally-btn late" data-go="tasks|late">' + late.length + ' overdue</button>');
+    bits.push('<button class="tally-btn" data-go="tasks|open">' + open.length + ' open</button>');
     if(appr) bits.push('<button class="tally-btn review" data-go="approve">' + appr + ' to approve</button>');
     el.innerHTML = bits.join("");
   }
@@ -872,8 +878,8 @@ button.act:disabled{opacity:.55;cursor:default}
     var appr = S.loaded ? approvals().length : 0;
     var openN = S.loaded ? S.tasks.filter(live).length : 0;
     el.innerHTML =
-      '<button type="button" role="tab" class="tab" id="tab-ledger" data-tab="ledger" aria-controls="view" aria-selected="' + (S.tab === "ledger") + '">' +
-        'Ledger' + (S.loaded ? '<span class="tab-n">' + openN + '</span>' : "") + '</button>' +
+      '<button type="button" role="tab" class="tab" id="tab-tasks" data-tab="tasks" aria-controls="view" aria-selected="' + (S.tab === "tasks") + '">' +
+        'Tasks' + (S.loaded ? '<span class="tab-n">' + openN + '</span>' : "") + '</button>' +
       '<button type="button" role="tab" class="tab" id="tab-approve" data-tab="approve" aria-controls="view" aria-selected="' + (S.tab === "approve") + '">' +
         'To approve' + (appr ? '<span class="tab-n hot">' + appr + '</span>' : "") + '</button>';
   }
@@ -887,7 +893,7 @@ button.act:disabled{opacity:.55;cursor:default}
         : '<div class="empty">This page can\u2019t reach your records right now. Open it from your Claude artifacts list while signed in.</div>';
       return;
     }
-    el.innerHTML = S.tab === "approve" ? renderApprove() : renderLedger();
+    el.innerHTML = S.tab === "approve" ? renderApprove() : renderTasks();
     // Keep the active chip in view; the row is rebuilt on every render.
     var chip = el.querySelector('.chip[aria-pressed="true"]');
     if(chip){
@@ -896,7 +902,7 @@ button.act:disabled{opacity:.55;cursor:default}
     }
   }
 
-  /* ----- ledger tab ----- */
+  /* ----- tasks tab ----- */
   function heroPick(){
     var open = S.tasks.filter(live);
     if(!open.length) return null;
@@ -951,7 +957,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
   function byRecent(a,b){ return (b.updated||b.created||"").localeCompare(a.updated||a.created||""); }
 
-  function renderLedger(){
+  function renderTasks(){
     var html = renderHero() + renderChips();
     if(S.filter === "notes") return html + renderNotes() + renderOrphans();
     var list = S.tasks.filter(matches);
@@ -1104,7 +1110,7 @@ button.act:disabled{opacity:.55;cursor:default}
   function renderApprove(){
     var items = approvals();
     if(!items.length){
-      return '<div class="empty approve-empty">Nothing to approve.<br>Things you tell Claude land here before they go on the ledger.</div>';
+      return '<div class="empty approve-empty">Nothing to approve.<br>Things you tell Claude land here before they go on your task list.</div>';
     }
     return '<div class="approve-head">' +
         '<p>' + plural(items.length, "item", "items") + ' Claude captured. File the ones that are right; tap one to fix details first.</p>' +
@@ -1136,7 +1142,7 @@ button.act:disabled{opacity:.55;cursor:default}
         '</span>' + CHEV +
       '</button>' +
       '<div class="pend-acts">' +
-        '<button type="button" class="act primary" data-file="' + esc(it.id) + '">' + (isNote ? "File note" : "File to ledger") + '</button>' +
+        '<button type="button" class="act primary" data-file="' + esc(it.id) + '">' + (isNote ? "File note" : "File as task") + '</button>' +
         '<button type="button" class="act danger" data-drop="' + esc(it.id) + '">Drop</button>' +
       '</div>' +
       (open ? renderPendDetail(it) : "") +
@@ -1200,7 +1206,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(isTask(id)){
       var t = findTask(id);
       if(!t) return;
-      S.tab = "ledger";
+      S.tab = "tasks";
       if(!matchesKey(t, S.filter) || S.filter === "notes") S.filter = live(t) ? "open" : "done";
       S.dirOpen[dirOf(t)] = true;
       S.open = id;
@@ -1215,7 +1221,7 @@ button.act:disabled{opacity:.55;cursor:default}
   function setTab(tab){
     if(S.tab === tab) return;
     S.tab = tab; S.editing = null; S.confirmAll = false;
-    try{ window.localStorage.setItem("ledger-tab", tab); }catch(e){}
+    try{ window.localStorage.setItem("tracker-tab", tab); }catch(e){}
     var bar = $("tabsBar");
     render();
     if(bar.classList.contains("stuck")){
@@ -1269,7 +1275,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(d.filter){ S.filter = d.filter; S.open = null; S.editing = null; render(); return; }
     if(d.toggleDir){
       S.dirOpen[d.toggleDir] = S.dirOpen[d.toggleDir] === false;
-      try{ window.localStorage.setItem("ledger-dirs", JSON.stringify(S.dirOpen)); }catch(err){}
+      try{ window.localStorage.setItem("tracker-dirs", JSON.stringify(S.dirOpen)); }catch(err){}
       render(); return;
     }
     if(d.jump){ jump(d.jump); return; }
@@ -1314,7 +1320,7 @@ button.act:disabled{opacity:.55;cursor:default}
           "Withdraw", function(){ dropItem(did); });
       } else {
         confirmThen(di.kind === "note" ? "Drop this note?" : "Drop this item?",
-          '<b>' + esc(di.title || di.body || di.raw || "This item") + '</b> is deleted and never reaches the ledger.',
+          '<b>' + esc(di.title || di.body || di.raw || "This item") + '</b> is deleted and never reaches your tasks.',
           "Drop", function(){ dropItem(did); });
       }
       return;
@@ -1374,7 +1380,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var prev = {status: t.status || "open", updated: t.updated || "", history: Array.isArray(t.history) ? t.history.slice() : []};
     var now = nowIso();
     var hist = prev.history.slice();
-    hist.push({at: now, text: "Status set to " + status + " from the ledger page."});
+    hist.push({at: now, text: "Status set to " + status + " from the tracker page."});
     t.status = status; t.updated = now; t.history = hist;
     if(status === "done" || status === "dropped"){ if(S.open === id && S.filter !== "done") S.open = null; }
     render();
@@ -1420,7 +1426,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var patch = {}; patch[key] = val;
     if(task){
       var hist = (Array.isArray(obj.history) ? obj.history.slice() : []);
-      hist.push({at: now, text: labelFor(obj, key) + " changed to \u201c" + (val ? (val.length > 90 ? val.slice(0, 90) + "\u2026" : val) : "(cleared)") + "\u201d from the ledger page."});
+      hist.push({at: now, text: labelFor(obj, key) + " changed to \u201c" + (val ? (val.length > 90 ? val.slice(0, 90) + "\u2026" : val) : "(cleared)") + "\u201d from the tracker page."});
       patch.updated = now; patch.history = hist;
       obj.updated = now; obj.history = hist;
     } else if(coll === "notes"){
@@ -1443,7 +1449,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var subject = selEl ? selEl.value : (S.noteNew.subject || "");
     var now = nowIso();
     var id = newId("n_");
-    db.doc("notes/" + id).set({body: body, subject: subject, task_id: "", created: now, source: "added on the ledger page"})
+    db.doc("notes/" + id).set({body: body, subject: subject, task_id: "", created: now, source: "added on the tracker page"})
       .then(function(){
         S.addingNote = false; S.noteNew = {};
         render();
@@ -1477,7 +1483,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(task){
       prev.updated = obj.updated || ""; prev.history = Array.isArray(obj.history) ? obj.history.slice() : [];
       var hist = prev.history.slice();
-      hist.push({at: now, text: "Direction set to " + (dir === "theirs" ? "owed to me" : "I deliver") + " from the ledger page."});
+      hist.push({at: now, text: "Direction set to " + (dir === "theirs" ? "owed to me" : "I deliver") + " from the tracker page."});
       patch.updated = now; patch.history = hist;
       obj.updated = now; obj.history = hist;
     }
@@ -1584,7 +1590,7 @@ button.act:disabled{opacity:.55;cursor:default}
     }
     return p.then(function(){
       if(!quiet){
-        toast(it.kind === "note" ? "Note filed" : "Filed to the ledger", {undo: function(){
+        toast(it.kind === "note" ? "Note filed" : "Filed as a task", {undo: function(){
           undo().then(function(){ toast("Back in To approve"); }).catch(warn);
         }});
       }
@@ -1601,7 +1607,7 @@ button.act:disabled{opacity:.55;cursor:default}
     });
     chain.then(function(){
       if(!undos.length) return;
-      toast("Filed " + plural(undos.length, "item", "items") + " to the ledger", {undo: function(){
+      toast("Filed " + plural(undos.length, "item", "items"), {undo: function(){
         var c = Promise.resolve();
         undos.forEach(function(u){ c = c.then(u); });
         c.then(function(){ toast("Back in To approve"); }).catch(warn);
@@ -1623,7 +1629,7 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   function warn(err){
-    console.error("ledger write failed", err);
+    console.error("tracker write failed", err);
     toast("That change didn\u2019t save. Check your connection and try again.", {error: true});
   }
 
@@ -1632,7 +1638,7 @@ button.act:disabled{opacity:.55;cursor:default}
   // Raw text goes to inbox only when you press Capture. Refine (optional) shows an editable draft first and writes nothing.
   var sampleFn = null, capBusy = false, capMode = "raw", capDraft = [], capOrig = "", capAs = "task";
   var capDefault = true;
-  try{ if(window.localStorage.getItem("ledger-refine") === "0") capDefault = false; }catch(e){}
+  try{ if(lsGet("tracker-refine", "ledger-refine") === "0") capDefault = false; }catch(e){}
   var capOn = capDefault;
   var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine"), capDraftEl = $("capDraft"), capKindEl = $("capKind");
   var REVIEW = ' <button type="button" class="cap-link" data-go="approve">Review</button>';
@@ -1657,7 +1663,7 @@ button.act:disabled{opacity:.55;cursor:default}
     capOn = !!on;
     if(persist){
       capDefault = capOn;
-      try{ window.localStorage.setItem("ledger-refine", capOn ? "1" : "0"); }catch(e){}
+      try{ window.localStorage.setItem("tracker-refine", capOn ? "1" : "0"); }catch(e){}
     }
     updateCapUI();
   }
@@ -1724,7 +1730,7 @@ button.act:disabled{opacity:.55;cursor:default}
       .map(function(s){ return {id: s.id, name: s.name}; });
     var t = today();
     return [
-      "You are the intake step of a personal commitments ledger. Split the input into discrete items, one commitment or note per item, and return them as JSON.",
+      "You are the intake step of a personal follow-up task tracker. Split the input into discrete items, one commitment or note per item, and return them as JSON.",
       "",
       "Today is " + isoDay(t) + " (" + t.toLocaleDateString("en-US", {weekday: "long"}) + ").",
       "Subjects (use the id, or \"\" if none fits): " + JSON.stringify(subs),
@@ -1863,10 +1869,10 @@ button.act:disabled{opacity:.55;cursor:default}
     capBusy = true; updateCapUI(); capSay("Saving\u2026");
     var asNote = capAs === "note";
     db.doc("inbox/" + id).set(asNote ? {
-      kind: "note", raw: raw, body: raw.slice(0, 2000), subject: "", source: "typed on ledger page", created: now, unrefined: true
+      kind: "note", raw: raw, body: raw.slice(0, 2000), subject: "", source: "typed on tracker page", created: now, unrefined: true
     } : {
       kind: "task", raw: raw, title: first, direction: "mine", counterparty: "", subject: "", due: "",
-      priority: "normal", next_action: "", source: "typed on ledger page", created: now, unrefined: true
+      priority: "normal", next_action: "", source: "typed on tracker page", created: now, unrefined: true
     }).then(function(){
       capText.value = ""; capText.style.height = ""; capAs = "task";
       capSay("Queued 1." + REVIEW);
@@ -1893,11 +1899,11 @@ button.act:disabled{opacity:.55;cursor:default}
       chain = chain.then(function(){
         var created = new Date(base + i).toISOString();
         var doc = it.kind === "note"
-          ? {kind: "note", raw: capOrig, body: trim(it.body), subject: it.subject || "", source: "typed on ledger page", created: created}
+          ? {kind: "note", raw: capOrig, body: trim(it.body), subject: it.subject || "", source: "typed on tracker page", created: created}
           : {kind: "task", raw: capOrig, title: trim(it.title), direction: it.direction === "theirs" ? "theirs" : "mine",
              counterparty: trim(it.counterparty || ""), subject: it.subject || "", due: validDay(it.due || "") ? it.due : "",
              priority: it.priority || "normal", next_action: trim(it.next_action || ""),
-             source: "typed on ledger page", created: created, unrefined: false};
+             source: "typed on tracker page", created: created, unrefined: false};
         return db.doc("inbox/" + newId("i_") + "x" + i).set(doc).then(function(){ it._saved = true; });
       });
     });
