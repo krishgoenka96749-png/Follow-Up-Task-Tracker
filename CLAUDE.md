@@ -53,11 +53,13 @@ Keep it a single self-contained `index.html`. Do not add a bundler, framework or
 
 ## Local dev
 
-There is no local runtime for `db`/`sample`. First task if none exists yet: add `dev/mock-claude.js` (in-memory `db` with `collection().onSnapshot`, `doc().set/update/delete`; a fake `sample.json`) plus a tiny dev server/wrapper that injects it. **Do not put the mock in `index.html`.** Type definitions for the real API are in `docs/contract/`.
+There is no local runtime for `db`/`sample`; `dev/` fakes both. The server reads `index.html` off disk untouched and injects `dev/seed.js` + `dev/mock-claude.js` into `<head>` on the way out. **The mock never goes in `index.html`** — the artifact is published from `index.html` alone.
 
 ```
-python3 -m http.server 8000   # then open the dev wrapper, not index.html directly
+python3 dev/server.py   # http://localhost:8000 — open this, not index.html directly
 ```
+
+`?fresh` reseeds, `?db=none` gives the disconnected state, `?sample=none` hides Refine, `?sample=<code>` makes the next refine fail. `window.__ledgerMock` has `dump()`, `reset()`, `failNext(code)`, `fail(code)`. Details in `dev/README.md`; the real API it imitates is in `docs/contract/`.
 
 ## Shipping (Claude Code cannot publish artifacts)
 
