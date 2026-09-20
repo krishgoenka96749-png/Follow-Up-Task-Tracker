@@ -331,7 +331,7 @@ div.hero{cursor:default}
   flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.4;
   background:var(--surface);color:var(--ink);
   border:1px solid var(--rule-strong);border-radius:var(--radius-sm);
-  padding:10px 11px;resize:vertical;min-height:46px;
+  padding:10px 11px;resize:none;overflow-y:hidden;min-height:46px;
 }
 .edit-box textarea:focus{border-color:var(--mine)}
 .edit-box .act{min-height:46px}
@@ -626,6 +626,25 @@ button.act:disabled{opacity:.55;cursor:default}
     var a = document.activeElement;
     return !!(a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
   }
+  // Grows with the text like a chat box, up to EDIT_MAX_LINES lines, then scrolls inside.
+  var EDIT_MAX_LINES = 4;
+  function fitTextarea(t){
+    if(!t) return;
+    t.style.height = "auto";
+    var cs = window.getComputedStyle(t);
+    var line = parseFloat(cs.lineHeight) || 22;
+    var edge = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    var max = Math.round(line * EDIT_MAX_LINES + edge);
+    var want = t.scrollHeight + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    t.style.height = Math.min(want, max) + "px";
+    t.style.overflowY = want > max ? "auto" : "hidden";
+  }
+  // Renders rebuild the boxes with their saved draft, so size them again.
+  function fitEditBoxes(){
+    var boxes = document.querySelectorAll("textarea[data-edit-for]");
+    for(var i = 0; i < boxes.length; i++) fitTextarea(boxes[i]);
+  }
+  window.addEventListener("resize", fitEditBoxes);
   function reducedMotion(){ return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
 
   /* ---------- toast ---------- */
@@ -843,6 +862,7 @@ button.act:disabled{opacity:.55;cursor:default}
     renderTabs();
     renderView();
     renderFoot();
+    fitEditBoxes();
     if(S.scrollTo){
       var target = document.querySelector(S.scrollTo);
       S.scrollTo = null;
@@ -1345,7 +1365,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(!t || !t.dataset) return;
     if(t.dataset.editFor){
       S.drafts[t.dataset.editFor] = t.value;
-      t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight + 2, 220) + "px";
+      fitTextarea(t);
     }
     if(t.dataset.fieldInput) S.fieldDraft[t.dataset.fieldInput] = t.value;
     if(t.dataset.newNote) S.noteNew[t.dataset.newNote] = t.value;
@@ -1526,7 +1546,7 @@ button.act:disabled{opacity:.55;cursor:default}
     if(task) doc.task_id = targetId; else doc.inbox_id = targetId;
     db.doc("inbox/" + id).set(doc).then(function(){
       delete S.drafts[targetId];
-      if(ta){ ta.value = ""; ta.style.height = ""; ta.blur(); }
+      if(ta){ ta.value = ""; fitTextarea(ta); ta.blur(); }
       if(btn){ btn.disabled = false; btn.textContent = "Send"; }
       toast("Sent to Claude");
       render();

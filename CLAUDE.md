@@ -31,7 +31,7 @@ Keep it a single self-contained `index.html`. Do not add a bundler, framework or
 
 - State: `S` (tasks, notes, subjects, inbox, tab, filter, drafts…). Render: `render` / `requestRender` → `renderTasks`, `renderNotes`, `renderApprove`, `renderHero`.
 - Data in: `subscribe(name, key)` at boot. Data out: `setStatus`, `setDirection`, `saveField`, `saveNewNote`, `deleteNote`, `submitEdit`, `fileItem`/`fileAll` (inbox → tasks/notes), `dropItem`.
-- Capture box: a Task/Note switch (`capAs`, `#capKind`) sits above the text box and works with Refine on or off. `capture` → `doRefine` (sample; `buildPrompt(raw, capAs)` is the intake prompt, hinted toward notes when Note is picked) / `captureRaw` (writes an `inbox` task or note per `capAs`) / `captureDraft` (after refine; each card has its own Task/Note switch); `cleanItem` sanitises model output. Per-viewer prefs go through `lsGet`.
+- Capture box: a Task/Note switch (`capAs`, `#capKind`) sits above the text box and works with Refine on or off. `capture` → `doRefine` (sample; `buildPrompt(raw, capAs)` is the intake prompt, hinted toward notes when Note is picked) / `captureRaw` (writes an `inbox` task or note per `capAs`) / `captureDraft` (after refine; each card has its own Task/Note switch); `cleanItem` sanitises model output. Per-viewer prefs go through `lsGet`. The "Tell Claude" edit box (`textarea[data-edit-for]`) auto-sizes via `fitTextarea` (max `EDIT_MAX_LINES` = 4), re-applied after every `render()` by `fitEditBoxes`.
 - Two tabs: **Tasks** (open tasks by direction: mine / theirs; filter chips include Notes) and **To approve** (pending inbox items).
 
 ## Rules that must not break
@@ -71,7 +71,7 @@ python3 dev/server.py   # http://localhost:8000 — open this, not index.html di
    - Do not bump the runtime contract (currently 0.2.52) as a side effect.
 4. Before pushing anything that changes the data shape, update `docs/SPEC.md`. Existing docs in the db are live; migrations must be additive or handled in code.
 
-Last published: 2026-09-20, artifact version 23 = `index.html` at commit `333f66d` (verified byte-identical to the live page). Docs-only commits after that don't need a republish; any `index.html` change does. Check the live version with the Artifact tool's `read` before trusting this line.
+Last published: 2026-09-20, artifact version 23 = `index.html` at commit `333f66d` (verified byte-identical to the live page). **Pending publish:** the edit-box auto-grow change (top of `docs/CHANGELOG.md`) is on `main` but not on the live artifact yet — delete this line once it is published. Docs-only commits don't need a republish; any `index.html` change does. Check the live version with the Artifact tool's `read` before trusting this line.
 
 ## Old names (the only places they survive)
 

@@ -4,6 +4,7 @@ Newest first. Commit hashes refer to `main`. Runtime contract 0.2.52 throughout.
 
 ## 2026-09-20
 Live artifact: versions 22 and 23 published today (v23 = `index.html` at `333f66d`).
+- **Pushed, NOT yet published:** the "Tell Claude" edit box now grows with the text like a chat box, up to 4 lines, then scrolls inside (`fitTextarea`, `fitEditBoxes`, `EDIT_MAX_LINES`). Before, it stayed one line (~5 words wide next to Send) and lost its size on every re-render. The capture box already grew (up to ~8 lines) and is unchanged.
 - `d99ec49` Docs: claude.ai project is "Follow Up Tracker"; the `ledger-18` CLI session was closed.
 - `333f66d` Naming sweep: nothing in the page, dev harness or docs says "ledger" except the deliberate fallbacks listed in `CLAUDE.md` under "Old names". Tab **Ledger** → **Tasks**; copy ("File as task", "Filed as a task", "Your tracker is clear.", new placeholder); JS `renderLedger` → `renderTasks`; localStorage `ledger-*` → `tracker-*` (old keys read as a fallback); new records' `source` and `history` text say "tracker page"; dev `__ledgerMock` → `__trackerMock`. GitHub repo renamed `Follow-Up-Tracker-Web-App` → `Follow-Up-Task-Tracker`.
 - `d2ff934` Docs: shipping via the Artifact tool from the desktop app.
