@@ -466,6 +466,9 @@ button.act:disabled{opacity:.55;cursor:default}
 .cap-status{font-size:13px;color:var(--ink-soft);margin-top:8px;line-height:1.45}
 .cap-status:empty{display:none}
 .cap-link{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--mine);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.cap-kind{margin-bottom:10px}
+.cap-kind .seg{width:170px}
+.cap-kind[hidden]{display:none}
 .cap-draft{margin-top:10px}
 .cd{background:var(--surface-sunk);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px}
 .cd-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
@@ -492,6 +495,10 @@ button.act:disabled{opacity:.55;cursor:default}
     <button class="theme-btn" id="themeBtn" aria-label="Switch between light and dark">&#9788;</button>
   </header>
   <section class="cap" id="cap" aria-label="Capture">
+    <div class="cap-kind" id="capKind"><div class="seg seg-dir" role="group" aria-label="Capture as">
+      <button type="button" data-cap-as="task" aria-pressed="true">Task</button>
+      <button type="button" data-cap-as="note" aria-pressed="false">Note</button>
+    </div></div>
     <textarea id="capText" rows="2" maxlength="6000" placeholder="Tell the ledger what came up." aria-label="Capture a task or note"></textarea>
     <div class="cap-draft" id="capDraft" hidden></div>
     <div class="cap-row">
@@ -1623,11 +1630,11 @@ button.act:disabled{opacity:.55;cursor:default}
 
   /* ---------- capture box ---------- */
   // Raw text goes to inbox only when you press Capture. Refine (optional) shows an editable draft first and writes nothing.
-  var sampleFn = null, capBusy = false, capMode = "raw", capDraft = [], capOrig = "";
+  var sampleFn = null, capBusy = false, capMode = "raw", capDraft = [], capOrig = "", capAs = "task";
   var capDefault = true;
   try{ if(window.localStorage.getItem("ledger-refine") === "0") capDefault = false; }catch(e){}
   var capOn = capDefault;
-  var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine"), capDraftEl = $("capDraft");
+  var capText = $("capText"), capGo = $("capGo"), capStatus = $("capStatus"), capRefine = $("capRefine"), capDraftEl = $("capDraft"), capKindEl = $("capKind");
   var REVIEW = ' <button type="button" class="cap-link" data-go="approve">Review</button>';
   var BACK = ' <button type="button" class="cap-link" data-cap-back="1">Back to text</button>';
 
@@ -1638,6 +1645,11 @@ button.act:disabled{opacity:.55;cursor:default}
     capGo.textContent = capBusy ? "Working\u2026" : (capWantsRefine() ? (capMode === "draft" ? "Refine again" : "Refine") : "Capture");
     capGo.disabled = !db || capBusy;
     capRefine.disabled = capBusy;
+    capKindEl.hidden = capMode === "draft"; // draft cards carry their own Task/Note switch
+    Array.prototype.forEach.call(capKindEl.querySelectorAll("[data-cap-as]"), function(b){
+      b.setAttribute("aria-pressed", b.dataset.capAs === capAs ? "true" : "false");
+      b.disabled = capBusy;
+    });
   }
   function capReady(){ updateCapUI(); }
   function capSay(html){ capStatus.innerHTML = html; }
@@ -1658,6 +1670,12 @@ button.act:disabled{opacity:.55;cursor:default}
   }
 
   capRefine.addEventListener("click", function(){ if(!capBusy) setToggle(!capOn, true); });
+  capKindEl.addEventListener("click", function(e){
+    var b = e.target.closest ? e.target.closest("[data-cap-as]") : null;
+    if(!b || capBusy) return;
+    capAs = b.dataset.capAs === "note" ? "note" : "task";
+    updateCapUI();
+  });
   capText.addEventListener("input", function(){
     capText.style.height = "auto"; capText.style.height = Math.min(capText.scrollHeight + 2, 200) + "px";
   });
@@ -1701,7 +1719,7 @@ button.act:disabled{opacity:.55;cursor:default}
     };
   }
 
-  function buildPrompt(raw){
+  function buildPrompt(raw, asKind){
     var subs = S.subjects.filter(function(s){ return s.active !== false; })
       .map(function(s){ return {id: s.id, name: s.name}; });
     var t = today();
@@ -1712,7 +1730,9 @@ button.act:disabled{opacity:.55;cursor:default}
       "Subjects (use the id, or \"\" if none fits): " + JSON.stringify(subs),
       "",
       "Rules:",
-      "- kind: default to \"task\". Use \"task\" whenever anyone needs to do, send, follow up, decide, check, deliver or wait on something. Use \"note\" only for pure information with no action. When unsure, choose \"task\".",
+      (asKind === "note"
+        ? "- kind: the user marked this input as a note. Use \"note\" for every item unless an item is plainly an action someone must take."
+        : "- kind: default to \"task\". Use \"task\" whenever anyone needs to do, send, follow up, decide, check, deliver or wait on something. Use \"note\" only for pure information with no action. When unsure, choose \"task\"."),
       "- title: imperative, specific, under 12 words. Keep the user's own wording where possible. Do not editorialise.",
       "- direction: \"mine\" if the user owes it; \"theirs\" if someone owes it to the user.",
       "- counterparty: a person or team, plain name; \"\" if none.",
@@ -1810,7 +1830,7 @@ button.act:disabled{opacity:.55;cursor:default}
     var raw = trim(capText.value);
     if(!raw){ capText.focus(); return; }
     capBusy = true; updateCapUI(); capSay("Refining with Claude\u2026 this can take up to a minute.");
-    sampleFn.json(buildPrompt(raw), {cache: false}).then(function(out){
+    sampleFn.json(buildPrompt(raw, capAs), {cache: false}).then(function(out){
       var arr = Array.isArray(out) ? out : (out && Array.isArray(out.items) ? out.items : null);
       var items = (arr || []).slice(0, 8).map(cleanItem).filter(function(x){ return x; });
       if(!items.length) throw {code: "invalid_json"};
@@ -1841,11 +1861,14 @@ button.act:disabled{opacity:.55;cursor:default}
     var first = raw.replace(/\s+/g, " ");
     if(first.length > 90) first = first.slice(0, 89) + "\u2026";
     capBusy = true; updateCapUI(); capSay("Saving\u2026");
-    db.doc("inbox/" + id).set({
+    var asNote = capAs === "note";
+    db.doc("inbox/" + id).set(asNote ? {
+      kind: "note", raw: raw, body: raw.slice(0, 2000), subject: "", source: "typed on ledger page", created: now, unrefined: true
+    } : {
       kind: "task", raw: raw, title: first, direction: "mine", counterparty: "", subject: "", due: "",
       priority: "normal", next_action: "", source: "typed on ledger page", created: now, unrefined: true
     }).then(function(){
-      capText.value = ""; capText.style.height = "";
+      capText.value = ""; capText.style.height = ""; capAs = "task";
       capSay("Queued 1." + REVIEW);
     }, function(err){
       console.error("capture failed", err);
@@ -1879,7 +1902,7 @@ button.act:disabled{opacity:.55;cursor:default}
       });
     });
     chain.then(function(){
-      capText.value = ""; capText.style.height = "";
+      capText.value = ""; capText.style.height = ""; capAs = "task";
       leaveDraft();
       capSay("Queued " + total + "." + REVIEW);
     }, function(err){
