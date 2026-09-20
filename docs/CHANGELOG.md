@@ -3,6 +3,7 @@
 Newest first. Commit hashes refer to `main`. Runtime contract 0.2.52 throughout.
 
 ## 2026-09-20
+- Project renamed **Follow Up Task Tracker** (was Ledger) and moved from `Sandboxes/ledger/` to `Sandboxes/General Projects/Follow Up Task Tracker/`. Docs only; `index.html`, the live artifact and the GitHub repo name are untouched.
 - Dev: `dev/` local mock harness — `server.py` injects `seed.js` + `mock-claude.js` into `<head>`, faking `db` (in-memory store, snapshots, queries, contract-shaped errors) and `sample` (regex intake). Seeded with subjects, tasks both directions incl. one overdue, notes and inbox items. `index.html` unchanged. See `dev/README.md`.
 - Docs: `CLAUDE.md`, `docs/SPEC.md`, `docs/RUNTIME.md`, `docs/CHANGELOG.md`, `docs/contract/` added for the move to Claude Code.
 

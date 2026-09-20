@@ -1,4 +1,4 @@
-# Ledger — behaviour spec and data model
+# Follow Up Task Tracker — behaviour spec and data model
 
 Source: the Claude project instructions for the Ledger project, copied here so the page and the spec live together. If the two ever disagree, fix whichever is wrong and note it under "Known drift".
 

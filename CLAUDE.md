@@ -1,6 +1,6 @@
-# Ledger — Claude Code context
+# Follow Up Task Tracker — Claude Code context
 
-Personal commitments ledger for Krish. Raw input (typed, dictated, pasted WhatsApp, meeting transcripts) becomes structured tasks, follow-ups and notes. Bookkeeping is the job; analysis and drafting only on request.
+Personal commitments ledger for Krish. Project name: **Follow Up Task Tracker** (was "Ledger" until 2026-09-20; the in-page "Ledger" tab and the claude.ai project name are unchanged). Lives at `~/Downloads/Sandboxes/General Projects/Follow Up Task Tracker/`. Raw input (typed, dictated, pasted WhatsApp, meeting transcripts) becomes structured tasks, follow-ups and notes. Bookkeeping is the job; analysis and drafting only on request.
 
 This repo is the **page** (the UI). The data lives in the claude.ai Artifact's `db`, not here.
 
