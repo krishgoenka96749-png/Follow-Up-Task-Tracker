@@ -16,7 +16,7 @@ Raw captures go to `inbox` immediately. Items move from `inbox` to `tasks`/`note
 
 Two things must both hold: nothing reaches the tracker unreviewed, and nothing the user said is ever lost. Capture to `inbox` is immediate and unconditional; promotion is gated. Never silently drop a capturable item. Only drop when the user explicitly says to.
 
-In the page, the **Approve** tab is the approval UI: user actions there (`fileItem`, `fileAll`, `dropItem`) are the approval.
+In the page, the **To approve** tab is the approval UI: user actions there (`fileItem`, `fileAll`, `dropItem`) are the approval.
 
 ## Resuming an interrupted turn
 
@@ -114,6 +114,8 @@ Fields the page uses that the data model above doesn't list:
 
 - `tasks.context` — free-text context, editable in the task detail (`TASK_FIELDS`).
 - `notes.source` — set to `"added on the tracker page"` for notes created in the page (records made before 2026-09-20 say `"added on the ledger page"`; same meaning).
+- `inbox.body` — for `kind: note` items captured in the page: the note text (they have no `title`). The page shows `title || body || raw`.
+- Page capture box — a Task/Note switch decides `kind` for raw captures; with Refine on, Claude (via `sample`) proposes the kinds and the user can flip each card before it is saved. Either way it lands in `inbox`, never straight in `tasks`/`notes`.
 - `inbox.unrefined` — `true` when captured raw (Refine off or failed), `false` when refined by Claude.
 - `inbox.source` — `"typed on tracker page"` for items captured from the page's capture box (older records say `"typed on ledger page"`); `"captured in chat"` is the default applied on promotion when a chat-captured item has none.
 

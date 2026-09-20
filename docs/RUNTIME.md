@@ -51,8 +51,18 @@ window.claude.use("sample").then(function(sample){
 
 ## Chat-side database access
 
-The project instructions tell Claude to use the Artifact tool's `read_db` / `write_db` actions against the artifact URL. Those actions were **not** exposed in the Artifact tool of the chat session on 2026-09-20 (it offered `publish`, `list`, `read`, `capabilities`, `open`). Check availability at the start of a session before relying on chat-side capture to `inbox`; if they're missing, say so rather than claiming a capture happened.
+The project instructions tell Claude to use `read_db` / `write_db` against the artifact URL. Availability varies by surface:
+
+- claude.ai chat, 2026-09-20 morning: **not** exposed (the Artifact tool offered `publish`, `list`, `read`, `capabilities`, `open`).
+- Claude desktop app, Code tab, 2026-09-20 afternoon: exposed as the deferred **`ArtifactData`** tool (`get`/`list`/`query`/`set`/`update`/`delete`/`batch`, `if_version` pinning) — load it via ToolSearch. Read-only use confirmed working against this artifact; the approval gate still applies to writes.
+
+Check availability at the start of a session before relying on chat-side capture to `inbox`; if the tools are missing, say so rather than claiming a capture happened.
 
 ## Publishing from this repo
 
-Claude Code can't publish. In a Claude chat: "pull main and republish" → Claude fetches `index.html` from GitHub and publishes it to `https://claude.ai/artifact/DFT23aPRfDHyockSvLFZwy` (existing artifact `url`, so the link and data stay). Rollback: republish an earlier commit's `index.html` the same way (`cab889d` = the page before the 2026-09-18 cleanup).
+Two routes, both publish `index.html` to `https://claude.ai/artifact/DFT23aPRfDHyockSvLFZwy` (existing artifact `url`, so the link and data stay; never pass `capabilities`):
+
+1. **Claude desktop app (Code tab)** — the Artifact tool publishes straight from this folder. It refuses until the live version has been `read` and its saved file fully Read; diff live vs `index.html` first. Used for versions 22 and 23 on 2026-09-20.
+2. **A claude.ai chat in the "Follow Up Tracker" project** — "pull main and republish"; Claude fetches `index.html` from GitHub.
+
+Rollback: republish an earlier commit's `index.html` the same way (`cab889d` = the page before the 2026-09-18 cleanup).

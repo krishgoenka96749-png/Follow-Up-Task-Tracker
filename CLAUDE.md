@@ -6,7 +6,7 @@ This repo is the **page** (the UI). The data lives in the claude.ai Artifact's `
 
 - Folder: `~/Downloads/Sandboxes/General Projects/Follow Up Task Tracker/` (this repo; ignored by the parent `General Projects` repo)
 - Live artifact: https://claude.ai/artifact/DFT23aPRfDHyockSvLFZwy (title "Follow Up Task Tracker")
-- Repo: `krishgoenka96749-png/Follow-Up-Task-Tracker` (private, branch `main`; renamed 2026-09-20 from `Follow-Up-Tracker-Web-App`, GitHub redirects the old URL)
+- Repo: `krishgoenka96749-png/Follow-Up-Task-Tracker` (**PUBLIC** as of 2026-09-20 — an earlier version of this file said private; it never was. Branch `main`; renamed 2026-09-20 from `Follow-Up-Tracker-Web-App`, GitHub redirects the old URL). Keep private data out: the db lives in claude.ai, `dev/seed.js` is fictional.
 - Docs: `docs/SPEC.md` (behaviour + data model), `docs/RUNTIME.md` (platform limits), `docs/CHANGELOG.md`
 
 ## Layout
@@ -31,7 +31,7 @@ Keep it a single self-contained `index.html`. Do not add a bundler, framework or
 
 - State: `S` (tasks, notes, subjects, inbox, tab, filter, drafts…). Render: `render` / `requestRender` → `renderTasks`, `renderNotes`, `renderApprove`, `renderHero`.
 - Data in: `subscribe(name, key)` at boot. Data out: `setStatus`, `setDirection`, `saveField`, `saveNewNote`, `deleteNote`, `submitEdit`, `fileItem`/`fileAll` (inbox → tasks/notes), `dropItem`.
-- Capture box: `capture` → `doRefine` (sample) / `captureRaw` / `captureDraft`; `buildPrompt` is the intake prompt; `cleanItem` sanitises model output.
+- Capture box: a Task/Note switch (`capAs`, `#capKind`) sits above the text box and works with Refine on or off. `capture` → `doRefine` (sample; `buildPrompt(raw, capAs)` is the intake prompt, hinted toward notes when Note is picked) / `captureRaw` (writes an `inbox` task or note per `capAs`) / `captureDraft` (after refine; each card has its own Task/Note switch); `cleanItem` sanitises model output. Per-viewer prefs go through `lsGet`.
 - Two tabs: **Tasks** (open tasks by direction: mine / theirs; filter chips include Notes) and **To approve** (pending inbox items).
 
 ## Rules that must not break
@@ -71,11 +71,11 @@ python3 dev/server.py   # http://localhost:8000 — open this, not index.html di
    - Do not bump the runtime contract (currently 0.2.52) as a side effect.
 4. Before pushing anything that changes the data shape, update `docs/SPEC.md`. Existing docs in the db are live; migrations must be additive or handled in code.
 
-Last published: 2026-09-20, artifact version 22 (Task/Note switch; title now "Follow Up Task Tracker").
+Last published: 2026-09-20, artifact version 23 = `index.html` at commit `333f66d` (verified byte-identical to the live page). Docs-only commits after that don't need a republish; any `index.html` change does. Check the live version with the Artifact tool's `read` before trusting this line.
 
 ## Old names (the only places they survive)
 
-Krish sometimes still says "the ledger". It means this project. Nothing in the page, dev harness or docs uses that word any more except these deliberate leftovers:
+Older notes, sessions or habit may still say "the ledger". It means this project; Krish wants it called Follow Up Task Tracker. Nothing in the page, dev harness or docs uses that word any more except these deliberate leftovers:
 
 - **claude.ai project** — named "Follow Up Tracker" (it never had the old name; earlier docs wrongly said it did). Its chat-side instructions are copied in `docs/SPEC.md`.
 - **Old path** `~/Downloads/Sandboxes/ledger/` — gone. (The CLI session `ledger-18` that pointed at it was closed 2026-09-20.)

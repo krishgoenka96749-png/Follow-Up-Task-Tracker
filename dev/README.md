@@ -17,7 +17,7 @@ script runs.
 | --- | --- |
 | `server.py` | static server + the `<head>` injection |
 | `mock-claude.js` | `claude.use("db")` / `claude.use("sample")` against an in-memory store |
-| `seed.js` | the starting documents: subjects, tasks (mine and theirs, one overdue), notes, inbox items including two `kind: edit` links |
+| `seed.js` | the starting documents (all fictional — the real data lives only in the claude.ai artifact's db; this repo is public): subjects, tasks (mine and theirs, one overdue), notes, inbox items including two `kind: edit` links |
 
 ## URL switches
 
